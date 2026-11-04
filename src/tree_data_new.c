@@ -211,9 +211,9 @@ lyd_create_any_datatree(const struct ly_ctx *ctx, const char *value, ly_bool log
     /* detect type */
     for (ptr = value; isspace(ptr[0]); ++ptr) {}
     if (ptr[0] == '<') {
-        rc = lyd_parse_xml(ctx, NULL, tree, in, parse_opts, 0, int_opts, NULL, &lydctx);
+        rc = lyd_parse_xml(ctx, NULL, tree, in, parse_opts, 0, int_opts, NULL, &lydctx, NULL);
     } else if (ptr[0] == '{') {
-        rc = lyd_parse_json(ctx, NULL, NULL, tree, in, parse_opts, 0, int_opts, NULL, &lydctx);
+        rc = lyd_parse_json(ctx, NULL, NULL, tree, in, parse_opts, 0, int_opts, NULL, &lydctx, NULL);
     } else {
         rc = LY_ENOT;
     }
@@ -461,7 +461,7 @@ lyd_new_inner(struct lyd_node *parent, const struct lys_module *module, const ch
     }
 
     r = lys_find_child_node(ctx, parent ? parent->schema : NULL, module, module->name, strlen(module->name),
-            LY_VALUE_JSON, NULL, name, 0, output ? LYS_GETNEXT_OUTPUT : 0, &schema, &ext);
+            LY_VALUE_JSON, NULL, name, 0, output ? LYS_GETNEXT_OUTPUT : 0, &schema, &ext, NULL);
     if (!r && !(schema->nodetype & (LYS_CONTAINER | LYS_NOTIF | LYS_RPC | LYS_ACTION))) {
         r = LY_ENOT;
     }
@@ -508,7 +508,7 @@ _lyd_new_list_node(const struct ly_ctx *ctx, const struct lyd_node *parent, cons
     }
 
     r = lys_find_child_node(ctx, parent ? parent->schema : NULL, module, module->name, strlen(module->name),
-            LY_VALUE_JSON, NULL, name, 0, getnext_opts, &schema, &ext);
+            LY_VALUE_JSON, NULL, name, 0, getnext_opts, &schema, &ext, NULL);
     if (!r && (schema->nodetype != LYS_LIST)) {
         r = LY_ENOT;
     }
@@ -597,7 +597,7 @@ lyd_new_list2(struct lyd_node *parent, const struct lys_module *module, const ch
 
     /* find schema node */
     r = lys_find_child_node(ctx, parent ? parent->schema : NULL, module, NULL, 0, 0, NULL, name, 0, getnext_opts,
-            &schema, &ext);
+            &schema, &ext, NULL);
     if (!r && (schema->nodetype != LYS_LIST)) {
         r = LY_ENOT;
     }
@@ -714,7 +714,7 @@ _lyd_new_term(struct lyd_node *parent, const struct lys_module *module, const ch
     }
 
     r = lys_find_child_node(ctx, parent ? parent->schema : NULL, module, module->name, strlen(module->name),
-            LY_VALUE_JSON, NULL, name, 0, getnext_opts, &schema, &ext);
+            LY_VALUE_JSON, NULL, name, 0, getnext_opts, &schema, &ext, NULL);
     if (!r && !(schema->nodetype & LYD_NODE_TERM)) {
         r = LY_ENOT;
     }
@@ -765,7 +765,7 @@ lyd_new_term_raw_canon(struct lyd_node *parent, const struct lys_module *module,
     }
 
     r = lys_find_child_node(ctx, parent ? parent->schema : NULL, module, module->name, strlen(module->name),
-            LY_VALUE_JSON, NULL, name, 0, getnext_opts, &schema, &ext);
+            LY_VALUE_JSON, NULL, name, 0, getnext_opts, &schema, &ext, NULL);
     if (!r && !(schema->nodetype & LYD_NODE_TERM)) {
         r = LY_ENOT;
     }
@@ -866,7 +866,7 @@ lyd_new_any(struct lyd_node *parent, const struct lys_module *module, const char
     }
 
     r = lys_find_child_node(ctx, parent ? parent->schema : NULL, module, module->name, strlen(module->name),
-            LY_VALUE_JSON, NULL, name, 0, getnext_opts, &schema, &ext);
+            LY_VALUE_JSON, NULL, name, 0, getnext_opts, &schema, &ext, NULL);
     if (!r && !(schema->nodetype & LYD_NODE_ANY)) {
         r = LY_ENOT;
     }

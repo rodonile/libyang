@@ -509,13 +509,14 @@ LY_ERR lys_find_child_node_ext(const struct ly_ctx *ctx, const struct lys_module
  * @param[in] options ORed [lys_getnext options](@ref sgetnextflags).
  * @param[out] snode Found schema node.
  * @param[out] ext Optional ext instance of @p snode.
+ * @param[in] anchor Optional caller-provided pointer. Currently ignored.
  * @return LY_SUCCESS on success;
  * @return LY_ENOT if not found;
  * @return LY_ERR on error.
  */
 LY_ERR lys_find_child_node(const struct ly_ctx *ctx, const struct lysc_node *parent, const struct lys_module *mod,
         const char *prefix, uint32_t prefix_len, LY_VALUE_FORMAT format, void *prefix_data, const char *name,
-        uint32_t name_len, uint32_t options, const struct lysc_node **snode, struct lysc_ext_instance **ext);
+        uint32_t name_len, uint32_t options, const struct lysc_node **snode, struct lysc_ext_instance **ext, void *anchor);
 
 /**
  * @brief When the module comes from YIN format, the argument name is unknown because of missing extension definition

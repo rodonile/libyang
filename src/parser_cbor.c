@@ -218,7 +218,7 @@ lydcbor_get_snode(struct lyd_cbor_ctx *lydctx, ly_bool is_attr, const char *pref
         prefix = NULL;
     }
     r = lys_find_child_node(parent ? LYD_CTX(parent) : lydctx->cborctx->ctx, sparent, mod, prefix, prefix_len,
-            LY_VALUE_CBOR, NULL, name, name_len, getnext_opts, snode, ext);
+            LY_VALUE_CBOR, NULL, name, name_len, getnext_opts, snode, ext, lydctx->anchor);
     LY_CHECK_RET(r && (r != LY_ENOT), r);
 
     if (!r) {
@@ -1592,7 +1592,7 @@ lyd_parse_cbor_init(const struct ly_ctx *ctx, struct ly_in *in, uint32_t parse_o
 LY_ERR
 lyd_parse_cbor(const struct ly_ctx *ctx, const struct lysc_ext_instance *ext, struct lyd_node *parent,
         struct lyd_node **first_p, struct ly_in *in, uint32_t parse_opts, uint32_t val_opts, uint32_t int_opts,
-        struct ly_set *parsed, ly_bool *subtree_sibling, struct lyd_ctx **lydctx_p)
+        struct ly_set *parsed, ly_bool *subtree_sibling, struct lyd_ctx **lydctx_p, void *anchor)
 {
     LY_ERR r, rc = LY_SUCCESS;
     struct lyd_cbor_ctx *lydctx = NULL;
@@ -1601,6 +1601,7 @@ lyd_parse_cbor(const struct ly_ctx *ctx, const struct lysc_ext_instance *ext, st
     LY_CHECK_GOTO(rc, cleanup);
 
     lydctx->int_opts = int_opts;
+    lydctx->anchor = anchor;
     lydctx->ext = ext;
 
     /* find the operation node if it exists already */

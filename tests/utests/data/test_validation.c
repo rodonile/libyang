@@ -21,11 +21,72 @@
 #include "in.h"
 #include "out.h"
 #include "parser_data.h"
+#include "parser_internal.h"
 #include "printer_data.h"
 #include "tree_schema.h"
 
 #define LYD_TREE_CREATE(INPUT, MODEL) \
                 CHECK_PARSE_LYD_PARAM(INPUT, LYD_XML, 0, LYD_VALIDATE_PRESENT, LY_SUCCESS, MODEL)
+
+static void
+test_parse_anchor(void **state)
+{
+    const char *schema =
+            "module a {"
+            "  yang-version 1.1;"
+            "  namespace urn:tests:a;"
+            "  prefix a;"
+            "  anydata payload;"
+            "  leaf value { type string; }"
+            "}";
+    const char *data[] = {
+        "<payload xmlns=\"urn:tests:a\"><payload><value>nested</value></payload></payload>",
+        "{\"a:payload\":{\"payload\":{\"value\":\"nested\"}}}"
+    };
+    LYD_FORMAT formats[] = {LYD_XML, LYD_JSON};
+    struct lyd_node *tree, *expected;
+    struct lyd_ctx *lydctx;
+    struct ly_in *in;
+    int anchor = 42;
+    void *anchors[] = {NULL, &anchor};
+    uint32_t i, j;
+
+    UTEST_ADD_MODULE(schema, LYS_IN_YANG, NULL, NULL);
+    assert_int_equal(offsetof(struct lyd_ctx, anchor), offsetof(struct lyd_xml_ctx, anchor));
+    assert_int_equal(offsetof(struct lyd_ctx, anchor), offsetof(struct lyd_json_ctx, anchor));
+    assert_int_equal(offsetof(struct lyd_ctx, anchor), offsetof(struct lyd_lyb_ctx, anchor));
+    assert_int_equal(offsetof(struct lyd_ctx, anchor), offsetof(struct lyd_cbor_ctx, anchor));
+
+    for (i = 0; i < sizeof formats / sizeof *formats; ++i) {
+        CHECK_PARSE_LYD_PARAM(data[i], formats[i], 0, LYD_VALIDATE_PRESENT, LY_SUCCESS, expected);
+        for (j = 0; j < sizeof anchors / sizeof *anchors; ++j) {
+            assert_int_equal(ly_in_new_memory(data[i], &in), LY_SUCCESS);
+            assert_int_equal(lyd_parse_data_with_anchor(UTEST_LYCTX, NULL, in, formats[i], 0,
+                    LYD_VALIDATE_PRESENT, &tree, anchors[j]), LY_SUCCESS);
+            assert_int_equal(lyd_compare_siblings(tree, expected, LYD_COMPARE_FULL_RECURSION), LY_SUCCESS);
+            lyd_free_all(tree);
+            ly_in_free(in, 0);
+
+            assert_int_equal(ly_in_new_memory(data[i], &in), LY_SUCCESS);
+            lydctx = NULL;
+            tree = NULL;
+            if (formats[i] == LYD_XML) {
+                assert_int_equal(lyd_parse_xml(UTEST_LYCTX, NULL, &tree, in, LYD_PARSE_ONLY, 0,
+                        LYD_INTOPT_WITH_SIBLINGS, NULL, &lydctx, anchors[j]), LY_SUCCESS);
+            } else {
+                assert_int_equal(lyd_parse_json(UTEST_LYCTX, NULL, NULL, &tree, in, LYD_PARSE_ONLY, 0,
+                        LYD_INTOPT_WITH_SIBLINGS, NULL, &lydctx, anchors[j]), LY_SUCCESS);
+            }
+            assert_non_null(lydctx);
+            assert_ptr_equal(lydctx->anchor, anchors[j]);
+            lydctx->free(lydctx);
+            lyd_free_all(tree);
+            ly_in_free(in, 0);
+        }
+        lyd_free_all(expected);
+    }
+    assert_int_equal(anchor, 42);
+}
 
 static void
 test_when(void **state)
@@ -1936,6 +1997,7 @@ int
 main(void)
 {
     const struct CMUnitTest tests[] = {
+        UTEST(test_parse_anchor),
         UTEST(test_when),
         UTEST(test_when_rpc_reply),
         UTEST(test_mandatory),

@@ -98,11 +98,12 @@ lyd_parse_get_format(const struct ly_in *in, LYD_FORMAT format)
  * @param[in] parse_opts Options for parser.
  * @param[in] val_opts Options for validation.
  * @param[out] op Optional pointer to the parsed operation, if any.
+ * @param[in] anchor Optional caller-provided pointer passed to schema lookup.
  * @return LY_ERR value.
  */
 static LY_ERR
 lyd_parse(const struct ly_ctx *ctx, struct lyd_node *parent, struct lyd_node **first_p, struct ly_in *in,
-        LYD_FORMAT format, uint32_t parse_opts, uint32_t val_opts, struct lyd_node **op)
+        LYD_FORMAT format, uint32_t parse_opts, uint32_t val_opts, struct lyd_node **op, void *anchor)
 {
     LY_ERR r = LY_SUCCESS, rc = LY_SUCCESS;
     struct lyd_ctx *lydctx = NULL;
@@ -126,17 +127,17 @@ lyd_parse(const struct ly_ctx *ctx, struct lyd_node *parent, struct lyd_node **f
     /* parse the data */
     switch (format) {
     case LYD_XML:
-        r = lyd_parse_xml(ctx, parent, first_p, in, parse_opts, val_opts, int_opts, &parsed, &lydctx);
+        r = lyd_parse_xml(ctx, parent, first_p, in, parse_opts, val_opts, int_opts, &parsed, &lydctx, anchor);
         break;
     case LYD_JSON:
-        r = lyd_parse_json(ctx, parent, NULL, first_p, in, parse_opts, val_opts, int_opts, &parsed, &lydctx);
+        r = lyd_parse_json(ctx, parent, NULL, first_p, in, parse_opts, val_opts, int_opts, &parsed, &lydctx, anchor);
         break;
     case LYD_LYB:
-        r = lyd_parse_lyb(ctx, parent, first_p, in, parse_opts, val_opts, int_opts, &parsed, &lydctx);
+        r = lyd_parse_lyb(ctx, parent, first_p, in, parse_opts, val_opts, int_opts, &parsed, &lydctx, anchor);
         break;
 #ifdef ENABLE_CBOR_SUPPORT
     case LYD_CBOR:
-        r = lyd_parse_cbor(ctx, NULL, parent, first_p, in, parse_opts, val_opts, int_opts, &parsed, NULL, &lydctx);
+        r = lyd_parse_cbor(ctx, NULL, parent, first_p, in, parse_opts, val_opts, int_opts, &parsed, NULL, &lydctx, anchor);
         break;
 #else
     case LYD_CBOR:
@@ -216,15 +217,13 @@ lyd_parse_data(const struct ly_ctx *ctx, struct lyd_node *parent, struct ly_in *
         ctx = LYD_CTX(parent);
     }
 
-    return lyd_parse(ctx, parent, tree, in, format, parse_options, validate_options, NULL);
+    return lyd_parse(ctx, parent, tree, in, format, parse_options, validate_options, NULL, NULL);
 }
 
 LIBYANG_API_DEF LY_ERR
 lyd_parse_data_with_anchor(const struct ly_ctx *ctx, struct lyd_node *parent, struct ly_in *in, LYD_FORMAT format,
         uint32_t parse_options, uint32_t validate_options, struct lyd_node **tree, void *anchor)
 {
-    (void)anchor;
-
     LY_CHECK_ARG_RET(ctx, ctx || parent, in, parent || tree, LY_EINVAL);
     LY_CHECK_ARG_RET(ctx, !(parse_options & ~LYD_PARSE_OPTS_MASK), LY_EINVAL);
     LY_CHECK_ARG_RET(ctx, !(validate_options & ~LYD_VALIDATE_OPTS_MASK), LY_EINVAL);
@@ -233,7 +232,7 @@ lyd_parse_data_with_anchor(const struct ly_ctx *ctx, struct lyd_node *parent, st
         ctx = LYD_CTX(parent);
     }
 
-    return lyd_parse(ctx, parent, tree, in, format, parse_options, validate_options, NULL);
+    return lyd_parse(ctx, parent, tree, in, format, parse_options, validate_options, NULL, anchor);
 }
 
 LIBYANG_API_DEF LY_ERR
@@ -340,7 +339,7 @@ lyd_parse_value_fragment(const struct ly_ctx *ctx, const char *path, struct ly_i
 
     /* parse the json value */
     LY_CHECK_GOTO(ret = lyd_parse_json(ctx, new_last_parent, new_node_schema, new_last_parent ? NULL : &new_top_parent,
-            in, parse_options, validate_options, 0, NULL, NULL), cleanup);
+            in, parse_options, validate_options, 0, NULL, NULL, NULL), cleanup);
 
     /* when setting keys they have to have a correct value (same as in the path) */
     if (lysc_is_key(new_node_schema)) {
@@ -496,17 +495,17 @@ lyd_parse_op(const struct ly_ctx *ctx, struct lyd_node *parent, struct ly_in *in
     /* parse the data */
     switch (format) {
     case LYD_XML:
-        rc = lyd_parse_xml(ctx, parent, &first, in, parse_options, val_opts, int_opts, &parsed, &lydctx);
+        rc = lyd_parse_xml(ctx, parent, &first, in, parse_options, val_opts, int_opts, &parsed, &lydctx, NULL);
         break;
     case LYD_JSON:
-        rc = lyd_parse_json(ctx, parent, NULL, &first, in, parse_options, val_opts, int_opts, &parsed, &lydctx);
+        rc = lyd_parse_json(ctx, parent, NULL, &first, in, parse_options, val_opts, int_opts, &parsed, &lydctx, NULL);
         break;
     case LYD_LYB:
-        rc = lyd_parse_lyb(ctx, parent, &first, in, parse_options, val_opts, int_opts, &parsed, &lydctx);
+        rc = lyd_parse_lyb(ctx, parent, &first, in, parse_options, val_opts, int_opts, &parsed, &lydctx, NULL);
         break;
 #ifdef ENABLE_CBOR_SUPPORT
     case LYD_CBOR:
-        rc = lyd_parse_cbor(ctx, NULL, parent, &first, in, parse_options, val_opts, int_opts, &parsed, NULL, &lydctx);
+        rc = lyd_parse_cbor(ctx, NULL, parent, &first, in, parse_options, val_opts, int_opts, &parsed, NULL, &lydctx, NULL);
         break;
 #else
     case LYD_CBOR:

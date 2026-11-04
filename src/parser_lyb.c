@@ -1768,7 +1768,8 @@ lyb_parse_header(struct lyd_lyb_ctx *lybctx)
 
 LY_ERR
 lyd_parse_lyb(const struct ly_ctx *ctx, struct lyd_node *parent, struct lyd_node **first_p, struct ly_in *in,
-        uint32_t parse_opts, uint32_t val_opts, uint32_t int_opts, struct ly_set *parsed, struct lyd_ctx **lydctx_p)
+        uint32_t parse_opts, uint32_t val_opts, uint32_t int_opts, struct ly_set *parsed, struct lyd_ctx **lydctx_p,
+        void *anchor)
 {
     LY_ERR rc = LY_SUCCESS;
     struct lyd_lyb_ctx *lybctx = NULL;
@@ -1791,6 +1792,7 @@ lyd_parse_lyb(const struct ly_ctx *ctx, struct lyd_node *parent, struct lyd_node
     lybctx->parse_opts = parse_opts;
     lybctx->val_opts = val_opts;
     lybctx->int_opts = int_opts;
+    lybctx->anchor = anchor;
     lybctx->free = lyb_parse_ctx_free;
 
     /* find the operation node if it exists already */

@@ -543,9 +543,11 @@ lys_find_child_node_ext(const struct ly_ctx *ctx, const struct lys_module *mod, 
 LY_ERR
 lys_find_child_node(const struct ly_ctx *ctx, const struct lysc_node *parent, const struct lys_module *mod,
         const char *prefix, uint32_t prefix_len, LY_VALUE_FORMAT format, void *prefix_data, const char *name,
-        uint32_t name_len, uint32_t options, const struct lysc_node **snode, struct lysc_ext_instance **ext)
+        uint32_t name_len, uint32_t options, const struct lysc_node **snode, struct lysc_ext_instance **ext, void *anchor)
 {
     const struct lysc_node *node = NULL;
+
+    (void)anchor;
 
     assert(name);
 
@@ -618,7 +620,7 @@ lys_find_child(const struct ly_ctx *ctx, const struct lysc_node *parent, const s
         name_len = strlen(name);
     }
 
-    lys_find_child_node(ctx, parent, mod, mod_name, mod_len, LY_VALUE_JSON, NULL, name, name_len, options, &snode, NULL);
+    lys_find_child_node(ctx, parent, mod, mod_name, mod_len, LY_VALUE_JSON, NULL, name, name_len, options, &snode, NULL, NULL);
     return snode;
 }
 
