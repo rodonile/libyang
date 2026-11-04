@@ -220,6 +220,23 @@ lyd_parse_data(const struct ly_ctx *ctx, struct lyd_node *parent, struct ly_in *
 }
 
 LIBYANG_API_DEF LY_ERR
+lyd_parse_data_with_anchor(const struct ly_ctx *ctx, struct lyd_node *parent, struct ly_in *in, LYD_FORMAT format,
+        uint32_t parse_options, uint32_t validate_options, struct lyd_node **tree, void *anchor)
+{
+    (void)anchor;
+
+    LY_CHECK_ARG_RET(ctx, ctx || parent, in, parent || tree, LY_EINVAL);
+    LY_CHECK_ARG_RET(ctx, !(parse_options & ~LYD_PARSE_OPTS_MASK), LY_EINVAL);
+    LY_CHECK_ARG_RET(ctx, !(validate_options & ~LYD_VALIDATE_OPTS_MASK), LY_EINVAL);
+
+    if (!ctx) {
+        ctx = LYD_CTX(parent);
+    }
+
+    return lyd_parse(ctx, parent, tree, in, format, parse_options, validate_options, NULL);
+}
+
+LIBYANG_API_DEF LY_ERR
 lyd_parse_data_mem_len(const struct ly_ctx *ctx, const char *data, uint32_t data_len, LYD_FORMAT format,
         uint32_t parse_options, uint32_t validate_options, struct lyd_node **tree)
 {
