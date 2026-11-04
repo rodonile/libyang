@@ -66,6 +66,7 @@ typedef void (*lyd_ctx_free_clb)(struct lyd_ctx *ctx);
 #define LYD_INTOPT_SKIP_SIBLINGS    0x40    /**< Perform the validation task only for the specfic subtree, skip other siblings. */
 #define LYD_INTOPT_NO_SIBLINGS      0x80    /**< If there are any siblings, return an error. */
 #define LYD_INTOPT_EVENTTIME        0x0100  /**< Parse notification eventTime node. */
+#define LYD_INTOPT_ANY_ANCHOR       0x0200  /**< Parse an anydata payload using the schema anchor. */
 
 /**
  * @brief Internal (common) context for YANG data parsers.
@@ -87,7 +88,7 @@ struct lyd_ctx {
     struct lyd_node *op_node;      /**< if an RPC/action/notification is being parsed, store the pointer to it */
     const struct lys_module *val_getnext_ht_mod;    /**< module of the cached schema nodes in getnext HT */
     struct ly_ht *val_getnext_ht;  /**< cached getnext schema nodes in a HT for validation */
-    void *anchor;                 /**< caller-provided pointer passed to schema lookup */
+    const char *anchor;           /**< caller-provided string passed to schema lookup */
 
     /* callbacks */
     lyd_ctx_free_clb free;         /**< destructor */
@@ -115,7 +116,7 @@ struct lyd_xml_ctx {
     struct lyd_node *op_node;
     const struct lys_module *val_getnext_ht_mod;
     struct ly_ht *val_getnext_ht;
-    void *anchor;
+    const char *anchor;
 
     /* callbacks */
     lyd_ctx_free_clb free;
@@ -139,7 +140,7 @@ struct lyd_json_ctx {
     struct lyd_node *op_node;
     const struct lys_module *val_getnext_ht_mod;
     struct ly_ht *val_getnext_ht;
-    void *anchor;
+    const char *anchor;
 
     /* callbacks */
     lyd_ctx_free_clb free;
@@ -169,7 +170,7 @@ struct lyd_lyb_ctx {
     struct lyd_node *op_node;
     const struct lys_module *val_getnext_ht_mod;
     struct ly_ht *val_getnext_ht;
-    void *anchor;
+    const char *anchor;
 
     /* callbacks */
     lyd_ctx_free_clb free;
@@ -196,7 +197,7 @@ struct lyd_cbor_ctx {
     struct lyd_node *op_node;            /**< if an operation is being parsed, its node */
     const struct lys_module *val_getnext_ht_mod;
     struct ly_ht *val_getnext_ht;
-    void *anchor;
+    const char *anchor;
 
     /* callbacks */
     lyd_ctx_free_clb free; /**< destructor */
@@ -278,12 +279,12 @@ LY_ERR yin_parse_submodule(struct lysp_yin_ctx **yin_ctx, struct ly_ctx *ctx, st
  * @param[in] int_opts Internal data parser options.
  * @param[out] parsed Set to add all the parsed siblings into.
  * @param[out] lydctx_p Data parser context to finish validation.
- * @param[in] anchor Optional caller-provided pointer passed to schema lookup.
+ * @param[in] anchor Optional caller-provided, null-terminated string passed to schema lookup.
  * @return LY_ERR value.
  */
 LY_ERR lyd_parse_xml(const struct ly_ctx *ctx, struct lyd_node *parent, struct lyd_node **first_p, struct ly_in *in,
         uint32_t parse_opts, uint32_t val_opts, uint32_t int_opts, struct ly_set *parsed, struct lyd_ctx **lydctx_p,
-        void *anchor);
+        const char *anchor);
 
 /**
  * @brief Parse XML string as a NETCONF message.
@@ -317,12 +318,12 @@ LY_ERR lyd_parse_xml_netconf(const struct ly_ctx *ctx, struct lyd_node *parent, 
  * @param[in] int_opts Internal data parser options.
  * @param[out] parsed Set to add all the parsed siblings into.
  * @param[out] lydctx_p Optional data parser context to finish validation.
- * @param[in] anchor Optional caller-provided pointer passed to schema lookup.
+ * @param[in] anchor Optional caller-provided, null-terminated string passed to schema lookup.
  * @return LY_ERR value.
  */
 LY_ERR lyd_parse_json(const struct ly_ctx *ctx, struct lyd_node *parent, const struct lysc_node *schema,
         struct lyd_node **first_p, struct ly_in *in, uint32_t parse_opts, uint32_t val_opts, uint32_t int_opts,
-        struct ly_set *parsed, struct lyd_ctx **lydctx_p, void *anchor);
+        struct ly_set *parsed, struct lyd_ctx **lydctx_p, const char *anchor);
 
 /**
  * @brief Parse JSON string as a RESTCONF message.
@@ -355,12 +356,12 @@ LY_ERR lyd_parse_json_restconf(const struct ly_ctx *ctx, struct lyd_node *parent
  * @param[in] int_opts Internal data parser options.
  * @param[out] parsed Set to add all the parsed siblings into.
  * @param[out] lydctx_p Data parser context to finish validation.
- * @param[in] anchor Optional caller-provided pointer stored in the parser context.
+ * @param[in] anchor Optional caller-provided, null-terminated string stored in the parser context.
  * @return LY_ERR value.
  */
 LY_ERR lyd_parse_lyb(const struct ly_ctx *ctx, struct lyd_node *parent, struct lyd_node **first_p, struct ly_in *in,
         uint32_t parse_opts, uint32_t val_opts, uint32_t int_opts, struct ly_set *parsed, struct lyd_ctx **lydctx_p,
-        void *anchor);
+        const char *anchor);
 
 /**
  * @brief Parse CBOR data into libyang data tree.
@@ -379,12 +380,12 @@ LY_ERR lyd_parse_lyb(const struct ly_ctx *ctx, struct lyd_node *parent, struct l
  * @param[out] parsed Set to add all the parsed siblings into.
  * @param[out] subtree_sibling Set if ::LYD_PARSE_SUBTREE is used and another subtree is following in @p in.
  * @param[out] lydctx_p Data parser context to finish validation.
- * @param[in] anchor Optional caller-provided pointer passed to schema lookup.
+ * @param[in] anchor Optional caller-provided, null-terminated string passed to schema lookup.
  * @return LY_ERR value.
  */
 LY_ERR lyd_parse_cbor(const struct ly_ctx *ctx, const struct lysc_ext_instance *ext, struct lyd_node *parent,
         struct lyd_node **first_p, struct ly_in *in, uint32_t parse_opts, uint32_t val_opts, uint32_t int_opts,
-        struct ly_set *parsed, ly_bool *subtree_sibling, struct lyd_ctx **lydctx_p, void *anchor);
+        struct ly_set *parsed, ly_bool *subtree_sibling, struct lyd_ctx **lydctx_p, const char *anchor);
 
 /**
  * @brief Validate eventTime date-and-time value.

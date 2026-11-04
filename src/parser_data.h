@@ -251,8 +251,10 @@ LIBYANG_API_DECL LY_ERR lyd_parse_data(const struct ly_ctx *ctx, struct lyd_node
 /**
  * @brief Parse (and validate) data from the input handler as a YANG data tree with an optional anchor.
  *
- * Identical to ::lyd_parse_data(), but forwards an additional @p anchor parameter to schema lookup,
- * where it is currently ignored.
+ * With a NULL @p anchor, behaves identically to ::lyd_parse_data(). Otherwise, each anydata payload root
+ * must match the schema node selected by @p anchor. The payload contains the anchored node itself, not
+ * its children. Descendants are parsed strictly against that schema and validated unless ::LYD_PARSE_ONLY
+ * is set. Anyxml parsing is unchanged.
  *
  * @param[in] ctx Context to connect with the tree being built here.
  * @param[in] parent Optional parent to connect the parsed nodes to. If provided, the data are expected to describe
@@ -262,12 +264,13 @@ LIBYANG_API_DECL LY_ERR lyd_parse_data(const struct ly_ctx *ctx, struct lyd_node
  * @param[in] parse_options Options for parser, see @ref dataparseroptions.
  * @param[in] validate_options Options for the validation phase, see @ref datavalidationoptions.
  * @param[out] tree Full parsed data tree, note that NULL can be a valid tree. If @p parent is set, the first parsed child.
- * @param[in] anchor Optional caller-provided pointer passed to schema lookup. Currently ignored; may be NULL.
+ * @param[in] anchor Optional absolute schema data path in JSON format (module names as prefixes).
+ * The string is borrowed for the duration of this call. Invalid or empty paths are rejected.
  * @return LY_SUCCESS in case of successful parsing (and validation).
  * @return LY_ERR value in case of error. Additional error information can be obtained from the context using ly_err* functions.
  */
 LIBYANG_API_DECL LY_ERR lyd_parse_data_with_anchor(const struct ly_ctx *ctx, struct lyd_node *parent, struct ly_in *in,
-        LYD_FORMAT format, uint32_t parse_options, uint32_t validate_options, struct lyd_node **tree, void *anchor);
+        LYD_FORMAT format, uint32_t parse_options, uint32_t validate_options, struct lyd_node **tree, const char *anchor);
 
 /**
  * @brief Parse (and validate) input data as a YANG data tree.

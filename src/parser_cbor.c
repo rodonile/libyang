@@ -218,7 +218,8 @@ lydcbor_get_snode(struct lyd_cbor_ctx *lydctx, ly_bool is_attr, const char *pref
         prefix = NULL;
     }
     r = lys_find_child_node(parent ? LYD_CTX(parent) : lydctx->cborctx->ctx, sparent, mod, prefix, prefix_len,
-            LY_VALUE_CBOR, NULL, name, name_len, getnext_opts, snode, ext, lydctx->anchor);
+            LY_VALUE_CBOR, NULL, name, name_len, getnext_opts, snode, ext,
+            (parent && parent->schema && (parent->schema->nodetype == LYS_ANYDATA)) ? lydctx->anchor : NULL);
     LY_CHECK_RET(r && (r != LY_ENOT), r);
 
     if (!r) {
@@ -1121,8 +1122,13 @@ lydcbor_parse_any(struct lyd_cbor_ctx *lydctx, const struct lysc_node *snode, st
         LY_CHECK_ERR_GOTO(r, rc = r, cleanup);
 
         /* parse data tree with correct options */
-        lydctx->parse_opts &= ~LYD_PARSE_STRICT;
-        lydctx->parse_opts |= LYD_PARSE_OPAQ | (ext ? LYD_PARSE_ONLY : 0);
+        if (lydctx->anchor && (snode->nodetype == LYS_ANYDATA)) {
+            lydctx->parse_opts |= LYD_PARSE_STRICT;
+        } else {
+            lydctx->parse_opts &= ~LYD_PARSE_STRICT;
+            lydctx->parse_opts |= LYD_PARSE_OPAQ;
+        }
+        lydctx->parse_opts |= (ext ? LYD_PARSE_ONLY : 0);
         lydctx->int_opts |= LYD_INTOPT_ANY | LYD_INTOPT_WITH_SIBLINGS;
         lydctx->any_schema = snode;
 
@@ -1592,7 +1598,7 @@ lyd_parse_cbor_init(const struct ly_ctx *ctx, struct ly_in *in, uint32_t parse_o
 LY_ERR
 lyd_parse_cbor(const struct ly_ctx *ctx, const struct lysc_ext_instance *ext, struct lyd_node *parent,
         struct lyd_node **first_p, struct ly_in *in, uint32_t parse_opts, uint32_t val_opts, uint32_t int_opts,
-        struct ly_set *parsed, ly_bool *subtree_sibling, struct lyd_ctx **lydctx_p, void *anchor)
+        struct ly_set *parsed, ly_bool *subtree_sibling, struct lyd_ctx **lydctx_p, const char *anchor)
 {
     LY_ERR r, rc = LY_SUCCESS;
     struct lyd_cbor_ctx *lydctx = NULL;

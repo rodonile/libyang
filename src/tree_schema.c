@@ -543,11 +543,9 @@ lys_find_child_node_ext(const struct ly_ctx *ctx, const struct lys_module *mod, 
 LY_ERR
 lys_find_child_node(const struct ly_ctx *ctx, const struct lysc_node *parent, const struct lys_module *mod,
         const char *prefix, uint32_t prefix_len, LY_VALUE_FORMAT format, void *prefix_data, const char *name,
-        uint32_t name_len, uint32_t options, const struct lysc_node **snode, struct lysc_ext_instance **ext, void *anchor)
+        uint32_t name_len, uint32_t options, const struct lysc_node **snode, struct lysc_ext_instance **ext, const char *anchor)
 {
     const struct lysc_node *node = NULL;
-
-    (void)anchor;
 
     assert(name);
 
@@ -561,6 +559,28 @@ lys_find_child_node(const struct ly_ctx *ctx, const struct lysc_node *parent, co
     }
     if (!name_len) {
         name_len = strlen(name);
+    }
+
+    if (anchor) {
+        node = lys_find_path(ctx, NULL, anchor, options & LYS_GETNEXT_OUTPUT);
+        if (!node) {
+            LOGERR(ctx, LY_EINVAL, "Invalid anydata schema anchor \"%s\".", anchor);
+            return LY_EINVAL;
+        }
+
+        if ((format != LY_VALUE_XML) && !prefix) {
+            mod = node->module;
+        } else {
+            mod = lys_find_module(ctx, NULL, prefix, prefix_len, format, prefix_data);
+        }
+        if ((mod == node->module) && !ly_strncmp(node->name, name, name_len)) {
+            *snode = node;
+            return LY_SUCCESS;
+        }
+
+        LOGVAL(ctx, NULL, LYVE_DATA, "Anydata payload node \"%.*s\" does not match schema anchor \"%s\".",
+                (int)name_len, name, anchor);
+        return LY_EVALID;
     }
 
     /* find the module */

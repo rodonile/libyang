@@ -400,6 +400,79 @@ test_parse(void **state)
 }
 
 static void
+test_yang_patch_anchor(void **state)
+{
+    const char *schema =
+            "module example {"
+            "  yang-version 1.1; namespace urn:example; prefix ex;"
+            "  container configuration {"
+            "    presence configuration;"
+            "    container settings {"
+            "      leaf limit { type uint8; mandatory true; }"
+            "    }"
+            "    container other { leaf limit { type string; } }"
+            "  }"
+            "}";
+    const char *messages[] = {
+        "{\"ietf-yang-patch:yang-patch\":{"
+        "\"patch-id\":\"patch-1\",\"edit\":[{"
+        "\"edit-id\":\"edit-1\",\"operation\":\"replace\","
+        "\"target\":\"/example:configuration/settings\","
+        "\"value\":{\"example:settings\":{\"limit\":42}}}]}}",
+        "{\"ietf-yang-patch:yang-patch\":{"
+        "\"patch-id\":\"patch-2\",\"edit\":[{"
+        "\"edit-id\":\"edit-1\",\"operation\":\"replace\","
+        "\"target\":\"/example:configuration/other\","
+        "\"value\":{\"example:settings\":{\"limit\":42}}}]}}",
+        "{\"ietf-yang-patch:yang-patch\":{"
+        "\"patch-id\":\"patch-3\",\"edit\":[{"
+        "\"edit-id\":\"edit-1\",\"operation\":\"replace\","
+        "\"target\":\"/example:configuration/settings\","
+        "\"value\":{\"example:settings\":{\"limit\":256}}}]}}"
+    };
+    struct lyd_node *message, *tree, *target, *value, *payload;
+    struct ly_in *in;
+    const char *anchor;
+    uint32_t i;
+    LY_ERR ret;
+
+    assert_int_equal(ly_ctx_set_searchdir(UTEST_LYCTX, TESTS_DIR_MODULES_YANG), LY_SUCCESS);
+    assert_non_null(ly_ctx_load_module(UTEST_LYCTX, "ietf-yang-patch", NULL, NULL));
+    UTEST_ADD_MODULE(schema, LYS_IN_YANG, NULL, NULL);
+
+    for (i = 0; i < sizeof messages / sizeof *messages; ++i) {
+        CHECK_PARSE_LYD_PARAM(messages[i], LYD_JSON, LYD_PARSE_ONLY, 0, LY_SUCCESS, message);
+        assert_int_equal(lyd_find_path(message, "edit[edit-id='edit-1']/target", 0, &target), LY_SUCCESS);
+        anchor = lyd_get_value(target);
+        assert_non_null(anchor);
+        assert_int_equal(lyd_find_path(message, "edit[edit-id='edit-1']/value", 0, &value), LY_SUCCESS);
+        assert_non_null(lyd_child_any(value));
+        assert_null(lyd_child_any(value)->schema);
+
+        assert_int_equal(ly_in_new_memory(messages[i], &in), LY_SUCCESS);
+        ret = lyd_parse_data_with_anchor(UTEST_LYCTX, NULL, in, LYD_JSON, LYD_PARSE_STRICT,
+                LYD_VALIDATE_PRESENT, &tree, anchor);
+        if (!i) {
+            assert_int_equal(ret, LY_SUCCESS);
+            assert_int_equal(lyd_find_path(tree, "edit[edit-id='edit-1']/value", 0, &value), LY_SUCCESS);
+            payload = lyd_child_any(value);
+            assert_non_null(payload);
+            assert_ptr_equal(payload->schema, lys_find_path(UTEST_LYCTX, NULL, anchor, 0));
+            assert_string_equal(payload->schema->name, "settings");
+            assert_string_equal(lyd_get_value(lyd_child(payload)), "42");
+        } else {
+            assert_int_equal(ret, LY_EVALID);
+            assert_null(tree);
+            assert_non_null(ly_err_last(UTEST_LYCTX));
+            UTEST_LOG_CTX_CLEAN;
+        }
+        lyd_free_all(tree);
+        ly_in_free(in, 0);
+        lyd_free_all(message);
+    }
+}
+
+static void
 test_xpath(void **state)
 {
     struct lyd_node *tree = NULL;
@@ -506,6 +579,7 @@ main(void)
         UTEST(test_schema),
         UTEST(test_schema_invalid),
         UTEST(test_parse),
+        UTEST(test_yang_patch_anchor),
         UTEST(test_xpath),
         UTEST(test_submod),
     };

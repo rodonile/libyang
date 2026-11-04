@@ -98,18 +98,19 @@ lyd_parse_get_format(const struct ly_in *in, LYD_FORMAT format)
  * @param[in] parse_opts Options for parser.
  * @param[in] val_opts Options for validation.
  * @param[out] op Optional pointer to the parsed operation, if any.
- * @param[in] anchor Optional caller-provided pointer passed to schema lookup.
+ * @param[in] anchor Optional caller-provided, null-terminated string passed to schema lookup.
  * @return LY_ERR value.
  */
 static LY_ERR
 lyd_parse(const struct ly_ctx *ctx, struct lyd_node *parent, struct lyd_node **first_p, struct ly_in *in,
-        LYD_FORMAT format, uint32_t parse_opts, uint32_t val_opts, struct lyd_node **op, void *anchor)
+        LYD_FORMAT format, uint32_t parse_opts, uint32_t val_opts, struct lyd_node **op, const char *anchor)
 {
     LY_ERR r = LY_SUCCESS, rc = LY_SUCCESS;
     struct lyd_ctx *lydctx = NULL;
     struct ly_set parsed = {0};
     uint32_t i, int_opts = 0;
     const struct ly_err_item *eitem;
+    const struct lysc_node *anchor_schema = NULL;
 
     assert(ctx && (parent || first_p));
 
@@ -118,11 +119,23 @@ lyd_parse(const struct ly_ctx *ctx, struct lyd_node *parent, struct lyd_node **f
         *first_p = NULL;
     }
 
+    if (anchor) {
+        if ((anchor[0] != '/') || !(anchor_schema = lys_find_path(ctx, NULL, anchor, 0))) {
+            LOGERR(ctx, LY_EINVAL, "Invalid anydata schema anchor \"%s\".", anchor);
+            rc = LY_EINVAL;
+            goto cleanup;
+        }
+    }
+
     /* remember input position */
     in->func_start = in->current;
 
     /* set internal options */
     int_opts = LYD_INTOPT_WITH_SIBLINGS;
+    if (anchor && parent && parent->schema && (parent->schema->nodetype == LYS_ANYDATA)) {
+        parse_opts |= LYD_PARSE_STRICT;
+        int_opts |= LYD_INTOPT_ANY | LYD_INTOPT_ANY_ANCHOR;
+    }
 
     /* parse the data */
     switch (format) {
@@ -176,7 +189,7 @@ lyd_parse(const struct ly_ctx *ctx, struct lyd_node *parent, struct lyd_node **f
     if (!(parse_opts & LYD_PARSE_ONLY)) {
         /* validate data */
         r = lyd_validate(first_p, NULL, ctx, val_opts, 0, &lydctx->node_when, &lydctx->node_types, &lydctx->meta_types,
-                &lydctx->ext_val, NULL);
+                &lydctx->ext_val, NULL, anchor_schema);
         LY_CHECK_ERR_GOTO(r, rc = r, cleanup);
     }
 
@@ -222,7 +235,7 @@ lyd_parse_data(const struct ly_ctx *ctx, struct lyd_node *parent, struct ly_in *
 
 LIBYANG_API_DEF LY_ERR
 lyd_parse_data_with_anchor(const struct ly_ctx *ctx, struct lyd_node *parent, struct ly_in *in, LYD_FORMAT format,
-        uint32_t parse_options, uint32_t validate_options, struct lyd_node **tree, void *anchor)
+        uint32_t parse_options, uint32_t validate_options, struct lyd_node **tree, const char *anchor)
 {
     LY_CHECK_ARG_RET(ctx, ctx || parent, in, parent || tree, LY_EINVAL);
     LY_CHECK_ARG_RET(ctx, !(parse_options & ~LYD_PARSE_OPTS_MASK), LY_EINVAL);

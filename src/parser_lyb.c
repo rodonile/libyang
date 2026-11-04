@@ -955,6 +955,18 @@ lyb_parse_schema_hash(struct lyd_lyb_ctx *lybctx, const struct lysc_node *sparen
 
     getnext_opts = lybctx->int_opts & LYD_INTOPT_REPLY ? LYS_GETNEXT_OUTPUT : 0;
 
+    if ((!sparent || (sparent->nodetype == LYS_ANYDATA)) && !mod &&
+            (lybctx->int_opts & LYD_INTOPT_ANY_ANCHOR)) {
+        sibling = lys_find_path(lybctx->parse_ctx->ctx, NULL, lybctx->anchor, getnext_opts);
+        if (!sibling || !lyb_is_schema_hash_match((struct lysc_node *)sibling, hash, hash_count)) {
+            LOGVAL(lybctx->parse_ctx->ctx, NULL, LYVE_DATA,
+                    "Anydata payload does not match schema anchor \"%s\".", lybctx->anchor);
+            return LY_EVALID;
+        }
+        *snode = sibling;
+        return LY_SUCCESS;
+    }
+
     /* find our node with matching hashes */
     sibling = NULL;
     while (1) {
@@ -1305,8 +1317,13 @@ lyb_parse_node_any(struct lyd_lyb_ctx *lybctx, struct lyd_node *parent, const st
         /* backup original options and use specific ones */
         prev_parse_opts = lybctx->parse_opts;
         prev_int_opts = lybctx->int_opts;
-        lybctx->parse_opts = LYD_PARSE_ONLY | LYD_PARSE_OPAQ;
-        lybctx->int_opts = LYD_INTOPT_ANY | LYD_INTOPT_WITH_SIBLINGS;
+        if (lybctx->anchor && (snode->nodetype == LYS_ANYDATA)) {
+            lybctx->parse_opts = prev_parse_opts | LYD_PARSE_STRICT;
+            lybctx->int_opts = LYD_INTOPT_ANY | LYD_INTOPT_WITH_SIBLINGS | LYD_INTOPT_ANY_ANCHOR;
+        } else {
+            lybctx->parse_opts = LYD_PARSE_ONLY | LYD_PARSE_OPAQ;
+            lybctx->int_opts = LYD_INTOPT_ANY | LYD_INTOPT_WITH_SIBLINGS;
+        }
 
         /* parse LYB siblings, restore options */
         rc = lyb_parse_siblings(lybctx, NULL, 0, NULL, &tree, NULL);
@@ -1612,6 +1629,15 @@ lyb_parse_node(struct lyd_lyb_ctx *lybctx, struct lyd_node *parent, struct lyd_n
         goto cleanup;
     }
 
+    if (snode && (!parent || (parent->schema && (parent->schema->nodetype == LYS_ANYDATA))) &&
+            (lybctx->int_opts & LYD_INTOPT_ANY_ANCHOR) &&
+            (snode != lys_find_path(lybctx->parse_ctx->ctx, NULL, lybctx->anchor, 0))) {
+        LOGVAL(lybctx->parse_ctx->ctx, NULL, LYVE_DATA,
+                "Anydata payload does not match schema anchor \"%s\".", lybctx->anchor);
+        rc = LY_EVALID;
+        goto cleanup;
+    }
+
     if (!snode) {
         rc = lyb_parse_node_opaq(lybctx, parent, first_p, parsed);
     } else if (snode->nodetype & LYS_LEAFLIST) {
@@ -1769,7 +1795,7 @@ lyb_parse_header(struct lyd_lyb_ctx *lybctx)
 LY_ERR
 lyd_parse_lyb(const struct ly_ctx *ctx, struct lyd_node *parent, struct lyd_node **first_p, struct ly_in *in,
         uint32_t parse_opts, uint32_t val_opts, uint32_t int_opts, struct ly_set *parsed, struct lyd_ctx **lydctx_p,
-        void *anchor)
+        const char *anchor)
 {
     LY_ERR rc = LY_SUCCESS;
     struct lyd_lyb_ctx *lybctx = NULL;

@@ -150,10 +150,11 @@ LY_ERR lyd_validate_node_ext(struct lyd_node *node, struct ly_set *ext_val);
  * @param[in] meta_types_p Set of unres metadata types, if NULL a local set is used.
  * @param[in] ext_val_p Set of unres extension data to validate, if NULL a local set is used.
  * @param[out] diff Generated validation diff, not generated if NULL.
+ * @param[in] anchor Optional schema node expected at the root of anydata payloads.
  * @return LY_ERR value.
  */
 LY_ERR lyd_validate(struct lyd_node **tree, const struct lys_module *module, const struct ly_ctx *ctx, uint32_t val_opts,
         ly_bool validate_subtree, struct ly_set *node_when_p, struct ly_set *node_types_p, struct ly_set *meta_types_p,
-        struct ly_set *ext_val_p, struct lyd_node **diff);
+        struct ly_set *ext_val_p, struct lyd_node **diff, const struct lysc_node *anchor);
 
 #endif /* LY_VALIDATION_H_ */

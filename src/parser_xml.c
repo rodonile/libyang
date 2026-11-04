@@ -594,7 +594,8 @@ lydxml_subtree_get_snode(struct lyd_xml_ctx *lydctx, const struct lyd_node *pare
         prefix = NULL;
     }
     r = lys_find_child_node(parent ? LYD_CTX(parent) : ctx, sparent, NULL, prefix, prefix_len, LY_VALUE_XML,
-            &lydctx->xmlctx->ns, name, name_len, getnext_opts, snode, ext, lydctx->anchor);
+            &lydctx->xmlctx->ns, name, name_len, getnext_opts, snode, ext,
+            (parent && parent->schema && (parent->schema->nodetype == LYS_ANYDATA)) ? lydctx->anchor : NULL);
     LY_CHECK_RET(r && (r != LY_ENOT), r);
 
     if (!r) {
@@ -967,7 +968,9 @@ lydxml_subtree_any(struct lyd_xml_ctx *lydctx, const struct lysc_node *snode, co
     LY_CHECK_ERR_GOTO(r, rc = r, cleanup);
 
     if (datatree_val) {
-        if (lydctx->parse_opts & LYD_PARSE_ANYDATA_STRICT) {
+        if (lydctx->anchor && (snode->nodetype == LYS_ANYDATA)) {
+            lydctx->parse_opts |= LYD_PARSE_STRICT;
+        } else if (lydctx->parse_opts & LYD_PARSE_ANYDATA_STRICT) {
             /* explicit strict data parsing */
             lydctx->parse_opts |= LYD_PARSE_STRICT;
         } else {
@@ -1226,7 +1229,7 @@ cleanup:
 LY_ERR
 lyd_parse_xml(const struct ly_ctx *ctx, struct lyd_node *parent, struct lyd_node **first_p, struct ly_in *in,
         uint32_t parse_opts, uint32_t val_opts, uint32_t int_opts, struct ly_set *parsed, struct lyd_ctx **lydctx_p,
-        void *anchor)
+        const char *anchor)
 {
     LY_ERR r, rc = LY_SUCCESS;
     struct lyd_xml_ctx *lydctx;
