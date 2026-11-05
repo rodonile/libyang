@@ -37,7 +37,7 @@
 static void
 cmd_data_help_header(void)
 {
-    printf("Usage: data [-emn] [-t TYPE]\n"
+    printf("Usage: data [-emn] [-t TYPE] [-a PATH]\n"
             "            [-F FORMAT] [-f FORMAT] [-d DEFAULTS] [-o OUTFILE] <data1> ...\n"
             "       data [-n] -t (rpc | notif | reply) [-O FILE]\n"
             "            [-F FORMAT] [-f FORMAT] [-d DEFAULTS] [-o OUTFILE] <data1> ...\n"
@@ -144,7 +144,11 @@ cmd_data_help(void)
             "                Provide source RPC for parsing of the 'nc-reply' TYPE. The FILE\n"
             "                is supposed to contain the source 'nc-rpc' operation of the reply.\n"
             "  -A, --anydata-strict\n"
-            "                Enable strict parsing of anydata content\n");
+            "                Enable strict parsing of anydata content\n"
+            "  -a PATH, --anchor=PATH\n"
+            "                Parse and validate anydata payload roots using the schema node at\n"
+            "                absolute PATH (module names as prefixes). Not supported with\n"
+            "                operation types, --merge, or --xpath.\n");
     cmd_data_help_format();
     cmd_data_help_in_format();
     printf("  -o OUTFILE, --output=OUTFILE\n"
@@ -170,6 +174,7 @@ cmd_data_opt(struct yl_opt *yo, const char *cmdline, char ***posv, int *posc)
         {"reply-rpc",       required_argument, NULL, 'R'},
         {"not-strict",      no_argument,       NULL, 'n'},
         {"anydata-strict",  no_argument,       NULL, 'A'},
+        {"anchor",          required_argument, NULL, 'a'},
         {"type",            required_argument, NULL, 't'},
         {"xpath",           required_argument, NULL, 'x'},
         {NULL, 0, NULL, 0}
@@ -244,6 +249,14 @@ cmd_data_opt(struct yl_opt *yo, const char *cmdline, char ***posv, int *posc)
             yo->data_parse_options |= LYD_PARSE_ANYDATA_STRICT;
             break;
 
+        case 'a': /* --anchor */
+            if (yo->data_anchor) {
+                YLMSG_E("The schema anchor (--anchor) cannot be set multiple times.");
+                return 1;
+            }
+            yo->data_anchor = optarg;
+            break;
+
         case 't': /* --type */
             if (data_type_set) {
                 YLMSG_E("The data type (-t) cannot be set multiple times.");
@@ -284,6 +297,21 @@ cmd_data_opt(struct yl_opt *yo, const char *cmdline, char ***posv, int *posc)
 int
 cmd_data_dep(struct yl_opt *yo, int posc)
 {
+    if (yo->data_anchor) {
+        if (yo->data_anchor[0] != '/') {
+            YLMSG_E("The schema anchor (--anchor) must be an absolute schema path.");
+            return 1;
+        }
+        if (yo->data_type != LYD_TYPE_DATA_YANG) {
+            YLMSG_E("The --anchor option is not supported with operation data types.");
+            return 1;
+        }
+        if (yo->data_merge || yo->data_xpath.count) {
+            YLMSG_E("The --anchor option cannot be combined with --merge or XPath selection.");
+            return 1;
+        }
+    }
+
     if (yo->interactive && !posc) {
         YLMSG_E("Missing the data file to process.");
         return 1;
@@ -491,11 +519,13 @@ cleanup:
  * @param[out] tree Pointer to the top-level data tree parsed from the input.
  * @param[out] op Pointer to the specific operation node.
  * @param[in] reply_rpc Source RPC operation file information for parsing NETCONF rpc-reply.
+ * @param[in] anchor Optional schema path for anydata payload roots.
  * @return LY_ERR value.
  */
 static LY_ERR
 parse_input_by_type(struct ly_ctx *ctx, enum lyd_type type, struct cmdline_file *input_f, uint32_t parse_options,
-        uint32_t validate_options, struct lyd_node **tree, struct lyd_node **op, struct cmdline_file *reply_rpc)
+        uint32_t validate_options, struct lyd_node **tree, struct lyd_node **op, struct cmdline_file *reply_rpc,
+        const char *anchor)
 {
 
     LY_ERR ret = LY_SUCCESS;
@@ -503,7 +533,8 @@ parse_input_by_type(struct ly_ctx *ctx, enum lyd_type type, struct cmdline_file 
 
     switch (type) {
     case LYD_TYPE_DATA_YANG:
-        ret = lyd_parse_data(ctx, NULL, input_f->in, input_f->format, parse_options, validate_options, tree);
+        ret = lyd_parse_data_with_anchor(ctx, NULL, input_f->in, input_f->format, parse_options, validate_options,
+                tree, anchor);
         break;
     case LYD_TYPE_RPC_YANG:
     case LYD_TYPE_REPLY_YANG:
@@ -572,7 +603,7 @@ cmd_data_process(struct ly_ctx *ctx, struct yl_opt *yo)
         struct cmdline_file *input_f = (struct cmdline_file *)yo->data_inputs.objs[u];
 
         ret = parse_input_by_type(ctx, yo->data_type, input_f, yo->data_parse_options, yo->data_validate_options,
-                &tree, &op, &yo->reply_rpc);
+                &tree, &op, &yo->reply_rpc, yo->data_anchor);
         if (ret) {
             YLMSG_E("Failed to parse input data file \"%s\".", input_f->path);
             goto cleanup;

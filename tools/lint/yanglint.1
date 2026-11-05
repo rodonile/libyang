@@ -144,6 +144,12 @@ the reply.
 .BR "\-m\fR,\fP \-\^\-merge"
 Merge input data files into a single tree and validate at once. The option has effect only for 'data' and 'config' TYPEs.
 .TP
+.BR "\-a \fIPATH\fP\fR,\fP \-\^\-anchor=\fIPATH\fP"
+Use the schema node at absolute PATH for anydata payload roots. PATH uses module names as prefixes.
+The payload contains the selected node itself, not its children. The same anchor applies to all anydata
+payloads in the input files; anyxml is unchanged. Cannot be combined with operation data types, --merge,
+or --data-xpath.
+.TP
 .BR "\-y\fR,\fP \-\^\-yang\-library"
 Load and implement internal 'ietf-yang-library' YANG module. Note that this module includes definitions of mandatory
 state data that can result in unexpected data validation errors.

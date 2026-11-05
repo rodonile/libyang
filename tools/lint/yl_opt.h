@@ -123,6 +123,9 @@ struct yl_opt {
     uint32_t data_validate_options;
     uint32_t data_print_options;
 
+    /* schema path used for anydata payloads (--anchor) */
+    const char *data_anchor;
+
     /* flag for --merge option */
     uint8_t data_merge;
 

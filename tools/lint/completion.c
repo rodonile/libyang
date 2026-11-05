@@ -520,6 +520,7 @@ complete_cmd(const char *buf, const char *hint, linenoiseCompletions *lc)
         {CMD_EXTDATA,     NULL,    NULL},
         {CMD_CLEAR,       "-Y",    NULL},
         {CMD_DATA,        "-t",    get_data_type_arg},
+        {CMD_DATA,        "-a",    NULL},
         {CMD_DATA,        "-O",    NULL},
         {CMD_DATA,        "-R",    NULL},
         {CMD_DATA,        "-f",    get_data_in_format_arg},

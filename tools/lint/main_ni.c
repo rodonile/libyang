@@ -139,6 +139,11 @@ help(int shortout)
     printf("  -A, --anydata-strict\n"
             "                Enable strict parsing of anydata content.\n\n");
 
+    printf("  -a PATH, --anchor=PATH\n"
+            "                Parse and validate anydata payload roots using the schema node at\n"
+            "                absolute PATH (module names as prefixes). Not supported with\n"
+            "                operation types, --merge, or --data-xpath.\n\n");
+
     printf("  -e, --present Validate only with the schema modules whose data actually\n"
             "                exist in the provided input data files. Takes effect only\n"
             "                with the 'data' or 'config' TYPEs. Used to avoid requiring\n"
@@ -550,6 +555,7 @@ process_args(int argc, char *argv[], struct yl_opt *yo, struct ly_ctx **ctx)
         {"ext-data",          required_argument, NULL, 'x'},
         {"not-strict",        no_argument,       NULL, 'n'},
         {"anydata-strict",    no_argument,       NULL, 'A'},
+        {"anchor",            required_argument, NULL, 'a'},
         {"present",           no_argument,       NULL, 'e'},
         {"type",              required_argument, NULL, 't'},
         {"default",           required_argument, NULL, 'd'},
@@ -587,7 +593,7 @@ process_args(int argc, char *argv[], struct yl_opt *yo, struct ly_ctx **ctx)
     yo->line_length = 0;
 
     opterr = 0;
-    while ((opt = getopt_long(argc, argv, "hvVQf:I:p:DF:iP:qs:neE:At:d:lL:o:O:R:myY:XJx:1:2:34G:S:Tg:u:r:U", options,
+    while ((opt = getopt_long(argc, argv, "hvVQf:I:p:DF:iP:qs:neE:Aa:t:d:lL:o:O:R:myY:XJx:1:2:34G:S:Tg:u:r:U", options,
             &opt_index)) != -1) {
         switch (opt) {
         case 'h': /* --help */
@@ -683,6 +689,14 @@ process_args(int argc, char *argv[], struct yl_opt *yo, struct ly_ctx **ctx)
 
         case 'A':   /* --anydata-strict */
             yo->data_parse_options |= LYD_PARSE_ANYDATA_STRICT;
+            break;
+
+        case 'a': /* --anchor */
+            if (yo->data_anchor) {
+                YLMSG_E("The schema anchor (--anchor) cannot be set multiple times.");
+                return -1;
+            }
+            yo->data_anchor = optarg;
             break;
 
         case 'e': /* --present */

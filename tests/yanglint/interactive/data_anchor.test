@@ -1,0 +1,21 @@
+source [expr {[info exists ::env(TESTS_DIR)] ? "$env(TESTS_DIR)/interactive/ly.tcl" : "ly.tcl"}]
+
+set ddir $::env(TESTS_DIR)/data
+
+test data_anchor_basic {anchor is available to the interactive data command} {
+-setup $ly_setup -cleanup $ly_cleanup -body {
+    ly_cmd "load modanchor"
+    ly_cmd "data --anchor=/modanchor:x/a -e $ddir/modanchor.json"
+    ly_cmd "data -a /modanchor:x/a -e $ddir/modanchor.json"
+    ly_cmd_err "data --anchor=/modanchor:a -e $ddir/modanchor.json" "Unsatisfied range"
+}}
+
+test data_anchor_reset {anchor does not persist between commands} {
+-setup $ly_setup -cleanup $ly_cleanup -body {
+    ly_cmd "load modanchor"
+    ly_cmd_err "data --anchor=relative $ddir/modanchor.json" "must be an absolute schema path"
+    ly_cmd "data --anchor=/modanchor:x/a -e $ddir/modanchor.json"
+    ly_cmd "data -e $ddir/modanchor.json"
+}}
+
+cleanupTests
