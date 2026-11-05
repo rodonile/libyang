@@ -140,6 +140,7 @@ help(int shortout)
             "                Enable strict parsing of anydata content.\n\n");
 
     printf("  -a PATH, --anchor=PATH\n"
+            "                Requires --anydata-strict (-A).\n"
             "                Resolve anydata payload roots among the direct data children of\n"
             "                absolute schema PATH (module names as prefixes). Not supported with\n"
             "                operation types, --merge, or --data-xpath.\n\n");

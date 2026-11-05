@@ -1377,9 +1377,7 @@ lydjson_parse_any(struct lyd_json_ctx *lydctx, const struct lysc_node *snode, co
 
     /* parse descendants */
     if (*status == LYJSON_OBJECT) {
-        if (lydctx->anchor && (snode->nodetype == LYS_ANYDATA)) {
-            lydctx->parse_opts |= LYD_PARSE_STRICT;
-        } else if (lydctx->parse_opts & LYD_PARSE_ANYDATA_STRICT) {
+        if (lydctx->parse_opts & LYD_PARSE_ANYDATA_STRICT) {
             /* explicit strict data parsing */
             lydctx->parse_opts |= LYD_PARSE_STRICT;
         } else {

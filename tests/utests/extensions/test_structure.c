@@ -451,7 +451,7 @@ test_yang_patch_anchor(void **state)
         assert_null(lyd_child_any(value)->schema);
 
         assert_int_equal(ly_in_new_memory(messages[i], &in), LY_SUCCESS);
-        ret = lyd_parse_data_with_anchor(UTEST_LYCTX, NULL, in, LYD_JSON, LYD_PARSE_STRICT,
+        ret = lyd_parse_data_with_anchor(UTEST_LYCTX, NULL, in, LYD_JSON, LYD_PARSE_STRICT | LYD_PARSE_ANYDATA_STRICT,
                 LYD_VALIDATE_PRESENT, &tree, anchor);
         if (!i) {
             assert_int_equal(ret, LY_SUCCESS);

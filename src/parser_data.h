@@ -251,7 +251,9 @@ LIBYANG_API_DECL LY_ERR lyd_parse_data(const struct ly_ctx *ctx, struct lyd_node
 /**
  * @brief Parse (and validate) data from the input handler as a YANG data tree with an optional anchor.
  *
- * With a NULL @p anchor, behaves identically to ::lyd_parse_data(). Otherwise, each anydata payload root
+ * With a NULL @p anchor, behaves identically to ::lyd_parse_data(). The anchor is used only when
+ * ::LYD_PARSE_ANYDATA_STRICT is set; it does not enable strict anydata parsing itself. Otherwise it is ignored.
+ * When enabled, each anydata payload root
  * is resolved by its node identifier among the direct data children of the schema node selected by @p anchor.
  * The payload contains these child nodes, not the anchor node. Deeper descendants are not searched.
  * Payloads are parsed strictly against the selected schemas and validated unless ::LYD_PARSE_ONLY
@@ -266,7 +268,7 @@ LIBYANG_API_DECL LY_ERR lyd_parse_data(const struct ly_ctx *ctx, struct lyd_node
  * @param[in] validate_options Options for the validation phase, see @ref datavalidationoptions.
  * @param[out] tree Full parsed data tree, note that NULL can be a valid tree. If @p parent is set, the first parsed child.
  * @param[in] anchor Optional absolute schema data path in JSON format (module names as prefixes).
- * The string is borrowed for the duration of this call. Invalid or empty paths are rejected.
+ * The string is borrowed for the duration of this call. Invalid or empty paths are rejected when the anchor is used.
  * @return LY_SUCCESS in case of successful parsing (and validation).
  * @return LY_ERR value in case of error. Additional error information can be obtained from the context using ly_err* functions.
  */

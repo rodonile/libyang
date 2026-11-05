@@ -146,6 +146,7 @@ cmd_data_help(void)
             "  -A, --anydata-strict\n"
             "                Enable strict parsing of anydata content\n"
             "  -a PATH, --anchor=PATH\n"
+            "                Requires --anydata-strict (-A).\n"
             "                Resolve anydata payload roots among the direct data children of\n"
             "                absolute schema PATH (module names as prefixes). Not supported with\n"
             "                operation types, --merge, or --xpath.\n");
@@ -298,12 +299,16 @@ int
 cmd_data_dep(struct yl_opt *yo, int posc)
 {
     if (yo->data_anchor) {
-        if (yo->data_anchor[0] != '/') {
-            YLMSG_E("The schema anchor (--anchor) must be an absolute schema path.");
-            return 1;
-        }
         if (yo->data_type != LYD_TYPE_DATA_YANG) {
             YLMSG_E("The --anchor option is not supported with operation data types.");
+            return 1;
+        }
+        if (!(yo->data_parse_options & LYD_PARSE_ANYDATA_STRICT)) {
+            YLMSG_E("The --anchor option requires --anydata-strict (-A).");
+            return 1;
+        }
+        if (yo->data_anchor[0] != '/') {
+            YLMSG_E("The schema anchor (--anchor) must be an absolute schema path.");
             return 1;
         }
         if (yo->data_merge || yo->data_xpath.count) {

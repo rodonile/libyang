@@ -119,6 +119,9 @@ lyd_parse(const struct ly_ctx *ctx, struct lyd_node *parent, struct lyd_node **f
         *first_p = NULL;
     }
 
+    if (!(parse_opts & LYD_PARSE_ANYDATA_STRICT)) {
+        anchor = NULL;
+    }
     if (anchor) {
         if ((anchor[0] != '/') || !(anchor_schema = lys_find_path(ctx, NULL, anchor, 0))) {
             LOGERR(ctx, LY_EINVAL, "Invalid anydata schema anchor \"%s\".", anchor);

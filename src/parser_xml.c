@@ -968,9 +968,7 @@ lydxml_subtree_any(struct lyd_xml_ctx *lydctx, const struct lysc_node *snode, co
     LY_CHECK_ERR_GOTO(r, rc = r, cleanup);
 
     if (datatree_val) {
-        if (lydctx->anchor && (snode->nodetype == LYS_ANYDATA)) {
-            lydctx->parse_opts |= LYD_PARSE_STRICT;
-        } else if (lydctx->parse_opts & LYD_PARSE_ANYDATA_STRICT) {
+        if (lydctx->parse_opts & LYD_PARSE_ANYDATA_STRICT) {
             /* explicit strict data parsing */
             lydctx->parse_opts |= LYD_PARSE_STRICT;
         } else {
