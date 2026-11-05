@@ -252,8 +252,9 @@ LIBYANG_API_DECL LY_ERR lyd_parse_data(const struct ly_ctx *ctx, struct lyd_node
  * @brief Parse (and validate) data from the input handler as a YANG data tree with an optional anchor.
  *
  * With a NULL @p anchor, behaves identically to ::lyd_parse_data(). Otherwise, each anydata payload root
- * must match the schema node selected by @p anchor. The payload contains the anchored node itself, not
- * its children. Descendants are parsed strictly against that schema and validated unless ::LYD_PARSE_ONLY
+ * is resolved by its node identifier among the direct data children of the schema node selected by @p anchor.
+ * The payload contains these child nodes, not the anchor node. Deeper descendants are not searched.
+ * Payloads are parsed strictly against the selected schemas and validated unless ::LYD_PARSE_ONLY
  * is set. Anyxml parsing is unchanged.
  *
  * @param[in] ctx Context to connect with the tree being built here.

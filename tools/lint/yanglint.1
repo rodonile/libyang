@@ -145,8 +145,9 @@ the reply.
 Merge input data files into a single tree and validate at once. The option has effect only for 'data' and 'config' TYPEs.
 .TP
 .BR "\-a \fIPATH\fP\fR,\fP \-\^\-anchor=\fIPATH\fP"
-Use the schema node at absolute PATH for anydata payload roots. PATH uses module names as prefixes.
-The payload contains the selected node itself, not its children. The same anchor applies to all anydata
+Resolve anydata payload node identifiers among the direct data children of the schema node at absolute PATH.
+PATH uses module names as prefixes. The payload contains child nodes, not the anchor node itself;
+deeper descendants are not searched. The same anchor applies to all anydata
 payloads in the input files; anyxml is unchanged. Cannot be combined with operation data types, --merge,
 or --data-xpath.
 .TP

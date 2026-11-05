@@ -509,7 +509,7 @@ LY_ERR lys_find_child_node_ext(const struct ly_ctx *ctx, const struct lys_module
  * @param[in] options ORed [lys_getnext options](@ref sgetnextflags).
  * @param[out] snode Found schema node.
  * @param[out] ext Optional ext instance of @p snode.
- * @param[in] anchor Optional absolute schema data path. If set, match only the node selected by this path.
+ * @param[in] anchor Optional absolute schema data path. If set, match only direct data children of this node.
  * @return LY_SUCCESS on success;
  * @return LY_ENOT if not found;
  * @return LY_ERR on error.

@@ -4,19 +4,23 @@ set mdir $::env(YANG_MODULES_DIR)
 set ddir $::env(TESTS_DIR)/data
 
 test data_anchor_long {anchor selects a non-root node with the same identifier as a root node} {
-    ly_cmd "--anchor=/modanchor:x/a -e -f json $mdir/modanchor.yang $ddir/modanchor.json" "\"a\": 0"
+    ly_cmd "--anchor=/modanchor:x -e -f json $mdir/modanchor.yang $ddir/modanchor.json" "\"a\": 0"
 } {}
 
 test data_anchor_short {short anchor option} {
-    ly_cmd "-a /modanchor:x/a -e $mdir/modanchor.yang $ddir/modanchor.json"
+    ly_cmd "-a /modanchor:x -e $mdir/modanchor.yang $ddir/modanchor.json"
 } {}
 
 test data_anchor_default {without an anchor anydata remains unchanged} {
     ly_cmd "-e $mdir/modanchor.yang $ddir/modanchor.json"
 } {}
 
-test data_anchor_wrong_schema {root schema has different value restrictions} {
-    ly_cmd_err "--anchor=/modanchor:a -e $mdir/modanchor.yang $ddir/modanchor.json" "Unsatisfied range"
+test data_anchor_wrong_schema {anchor must be the parent, not the payload node} {
+    ly_cmd_err "--anchor=/modanchor:x/a -e $mdir/modanchor.yang $ddir/modanchor.json" "is not a child of schema anchor"
+} {}
+
+test data_anchor_deep {deeper descendants cannot be selected by their identifier} {
+    ly_cmd_err "--anchor=/modanchor:x -e $mdir/modanchor.yang $ddir/modanchor-deep.json" "is not a child of schema anchor"
 } {}
 
 test data_anchor_invalid {unknown schema path} {
@@ -32,19 +36,19 @@ test data_anchor_empty {empty anchor is not treated as absent} {
 } {}
 
 test data_anchor_merge {merged validation cannot silently skip anchored payloads} {
-    ly_cmd_err "--anchor=/modanchor:x/a -m $mdir/modanchor.yang $ddir/modanchor.json" "cannot be combined"
+    ly_cmd_err "--anchor=/modanchor:x -m $mdir/modanchor.yang $ddir/modanchor.json" "cannot be combined"
 } {}
 
 test data_anchor_xpath {XPath selection implies merged validation} {
-    ly_cmd_err "--anchor=/modanchor:x/a -E /modanchor:message $mdir/modanchor.yang $ddir/modanchor.json" "cannot be combined"
+    ly_cmd_err "--anchor=/modanchor:x -E /modanchor:message $mdir/modanchor.yang $ddir/modanchor.json" "cannot be combined"
 } {}
 
 test data_anchor_operation {operation parsing does not support anchors} {
-    ly_cmd_err "--anchor=/modanchor:x/a -t rpc $mdir/modanchor.yang $ddir/modanchor.json" "not supported with operation"
+    ly_cmd_err "--anchor=/modanchor:x -t rpc $mdir/modanchor.yang $ddir/modanchor.json" "not supported with operation"
 } {}
 
 test data_anchor_duplicate {anchor may be specified only once} {
-    ly_cmd_err "-a /modanchor:x/a -a /modanchor:a $mdir/modanchor.yang $ddir/modanchor.json" "cannot be set multiple times"
+    ly_cmd_err "-a /modanchor:x -a /modanchor:a $mdir/modanchor.yang $ddir/modanchor.json" "cannot be set multiple times"
 } {}
 
 cleanupTests

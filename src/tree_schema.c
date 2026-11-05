@@ -573,12 +573,16 @@ lys_find_child_node(const struct ly_ctx *ctx, const struct lysc_node *parent, co
         } else {
             mod = lys_find_module(ctx, NULL, prefix, prefix_len, format, prefix_data);
         }
-        if ((mod == node->module) && !ly_strncmp(node->name, name, name_len)) {
-            *snode = node;
-            return LY_SUCCESS;
+        parent = node;
+        node = NULL;
+        while ((node = lys_getnext(node, parent, NULL, options))) {
+            if ((mod == node->module) && !ly_strncmp(node->name, name, name_len)) {
+                *snode = node;
+                return LY_SUCCESS;
+            }
         }
 
-        LOGVAL(ctx, NULL, LYVE_DATA, "Anydata payload node \"%.*s\" does not match schema anchor \"%s\".",
+        LOGVAL(ctx, NULL, LYVE_DATA, "Anydata payload node \"%.*s\" is not a child of schema anchor \"%s\".",
                 (int)name_len, name, anchor);
         return LY_EVALID;
     }

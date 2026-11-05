@@ -1608,30 +1608,23 @@ cleanup:
  * @param[in] val_opts Validation options, see @ref datavalidationoptions.
  * @param[in] int_opts Internal parser options.
  * @param[in,out] getnext_ht Getnext HT to use, new @p sparent is added to it.
- * @param[in] anchor Optional single schema node to validate instead of all schema siblings.
  * @return LY_ERR value.
  */
 static LY_ERR
 lyd_validate_siblings_schema_r(const struct lyd_node *first, const struct lyd_node *parent,
         const struct lysc_node *sparent, const struct lys_module *mod, uint32_t val_opts, uint32_t int_opts,
-        struct ly_ht *getnext_ht, const struct lysc_node *anchor)
+        struct ly_ht *getnext_ht)
 {
     LY_ERR r, rc = LY_SUCCESS;
     const struct lysc_node *snode, *scase, **choices, **snodes;
     struct lysc_node_list *slist;
     struct lysc_node_leaflist *sllist;
     uint32_t i;
-    const struct lysc_node *anchored_snodes[] = {anchor, NULL};
 
     /* get cached getnext schema nodes */
-    if (anchor) {
-        choices = NULL;
-        snodes = anchored_snodes;
-    } else {
-        rc = lyd_val_getnext_get(first ? first->schema : NULL, sparent, mod, int_opts & LYD_INTOPT_REPLY, getnext_ht,
-                &choices, &snodes);
-        LY_CHECK_GOTO(rc, cleanup);
-    }
+    rc = lyd_val_getnext_get(first ? first->schema : NULL, sparent, mod, int_opts & LYD_INTOPT_REPLY, getnext_ht,
+            &choices, &snodes);
+    LY_CHECK_GOTO(rc, cleanup);
 
     for (i = 0; choices && choices[i]; ++i) {
         snode = choices[i];
@@ -1651,7 +1644,7 @@ lyd_validate_siblings_schema_r(const struct lyd_node *first, const struct lyd_no
         LY_LIST_FOR(lysc_node_child(snode), scase) {
             if (lys_getnext_data(NULL, first, NULL, scase, NULL)) {
                 /* validate only this case */
-                r = lyd_validate_siblings_schema_r(first, parent, scase, mod, val_opts, int_opts, getnext_ht, NULL);
+                r = lyd_validate_siblings_schema_r(first, parent, scase, mod, val_opts, int_opts, getnext_ht);
                 LY_VAL_ERR_GOTO(r, rc = r, val_opts, cleanup);
                 break;
             }
@@ -1816,7 +1809,7 @@ cleanup:
  * @param[in] int_opts Internal parser options.
  * @param[in] must_xp_opts Additional XPath options to use for evaluating "must".
  * @param[in,out] getnext_ht Getnext HT to use.
- * @param[in] anchor Optional schema node expected at the root of anydata payloads.
+ * @param[in] anchor Optional schema parent of anydata payload roots.
  * @return LY_ERR value.
  */
 static LY_ERR
@@ -1841,8 +1834,8 @@ lyd_validate_final_r(struct lyd_node *first, const struct lyd_node *parent, cons
             goto next_iter;
         }
 
-        if (anchor && sparent && (sparent->nodetype == LYS_ANYDATA) && (node->schema != anchor)) {
-            LOGVAL(LYD_CTX(node), node, LYVE_DATA, "Anydata payload node \"%s\" does not match schema anchor \"%s\".",
+        if (anchor && sparent && (sparent->nodetype == LYS_ANYDATA) && (lysc_data_parent(node->schema) != anchor)) {
+            LOGVAL(LYD_CTX(node), node, LYVE_DATA, "Anydata payload node \"%s\" is not a child of schema anchor \"%s\".",
                     node->schema->name, anchor->name);
             r = LY_EVALID;
             goto next_iter;
@@ -1900,8 +1893,9 @@ next_iter:
     }
 
     /* validate schema-based restrictions */
-    r = lyd_validate_siblings_schema_r(first, parent, sparent, mod, val_opts, int_opts & ~LYD_INTOPT_SKIP_SIBLINGS,
-            getnext_ht, (sparent && (sparent->nodetype == LYS_ANYDATA)) ? anchor : NULL);
+    r = lyd_validate_siblings_schema_r(first, parent,
+            (anchor && sparent && (sparent->nodetype == LYS_ANYDATA)) ? anchor : sparent,
+            mod, val_opts, int_opts & ~LYD_INTOPT_SKIP_SIBLINGS, getnext_ht);
     LY_VAL_ERR_GOTO(r, rc = r, val_opts, cleanup);
 
     LY_LIST_FOR(first, node) {

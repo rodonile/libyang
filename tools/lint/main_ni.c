@@ -140,8 +140,8 @@ help(int shortout)
             "                Enable strict parsing of anydata content.\n\n");
 
     printf("  -a PATH, --anchor=PATH\n"
-            "                Parse and validate anydata payload roots using the schema node at\n"
-            "                absolute PATH (module names as prefixes). Not supported with\n"
+            "                Resolve anydata payload roots among the direct data children of\n"
+            "                absolute schema PATH (module names as prefixes). Not supported with\n"
             "                operation types, --merge, or --data-xpath.\n\n");
 
     printf("  -e, --present Validate only with the schema modules whose data actually\n"
