@@ -665,6 +665,17 @@ test_ylmem(void **state)
             "  </module>\n"
             "</modules-state>");
 
+    const char *augby_other_revision =
+            DATA_YANG_LIBRARY_START
+            "    <module>\n"
+            "      <name>ietf-yang-library-augmentedby</name>\n"
+            "      <revision>2099-01-01</revision>\n"
+            "      <namespace>urn:ietf:params:xml:ns:yang:ietf-yang-library-augmentedby</namespace>\n"
+            "    </module>\n"
+            DATA_YANG_BASE_IMPORTS
+            DATA_YANG_SCHEMA_MODULE_STATE
+            "</modules-state>\n";
+
     const char *garbage_revision =
             "<yang-library xmlns=\"urn:ietf:params:xml:ns:yang:ietf-yang-library\">\n"
             "  <module-set>\n"
@@ -699,6 +710,7 @@ test_ylmem(void **state)
     (void) state;
     /* seperate context to avoid double free during teadown */
     struct ly_ctx *ctx_test = NULL;
+    struct lyd_node *yl_data = NULL;
     const char *search_paths = TESTS_SRC "/../modules" PATH_SEPARATOR TESTS_SRC "/modules/yang";
 
     /* test invalid parameters */
@@ -728,6 +740,16 @@ test_ylmem(void **state)
     assert_non_null(ly_ctx_get_module(ctx_test, "ietf-netconf", "2011-06-01"));
     assert_non_null(ly_ctx_get_module(ctx_test, "ietf-netconf-acm", "2018-02-14"));
     assert_int_equal(LY_SUCCESS, lys_feature_value(ly_ctx_get_module(ctx_test, "ietf-netconf", "2011-06-01"), "url"));
+    ly_ctx_destroy(ctx_test);
+    ctx_test = NULL;
+
+    /* test yang-library data requiring another revision of a built-in yang-library extension module */
+    assert_int_equal(LY_SUCCESS, ly_ctx_new_ylmem(search_paths, augby_other_revision, LYD_XML, 0, &ctx_test));
+    assert_non_null(ly_ctx_get_module_implemented(ctx_test, "ietf-yang-library-augmentedby"));
+    assert_string_equal("2099-01-01", ly_ctx_get_module_implemented(ctx_test, "ietf-yang-library-augmentedby")->revision);
+    assert_null(ly_ctx_get_module(ctx_test, "ietf-yang-library-augmentedby", "2025-05-28"));
+    assert_int_equal(LY_SUCCESS, ly_ctx_get_yanglib_data(ctx_test, &yl_data, "%u", 1));
+    lyd_free_all(yl_data);
     ly_ctx_destroy(ctx_test);
     ctx_test = NULL;
 

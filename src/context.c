@@ -78,6 +78,9 @@ static struct internal_modules_s {
 #define LY_INTERNAL_MODS_COUNT sizeof(internal_modules) / sizeof(struct internal_modules_s)
 #define LY_INTERNAL_YANGLIB_MODS_COUNT 5
 
+/* the last internal modules (ietf-yang-library-status, -augmentedby, -semver) whose revision yang-library data may override */
+#define LY_INTERNAL_YANGLIB_EXT_MODS_COUNT 3
+
 LIBYANG_API_DEF LY_ERR
 ly_ctx_set_searchdir(struct ly_ctx *ctx, const char *search_dir)
 {
@@ -271,8 +274,17 @@ cleanup:
     return mod;
 }
 
-LIBYANG_API_DEF LY_ERR
-ly_ctx_new(const char *search_dir, uint32_t options, struct ly_ctx **new_ctx)
+/**
+ * @brief Create a new context.
+ *
+ * @param[in] search_dir Directory (or directories) where to search for YANG modules.
+ * @param[in] options Context options.
+ * @param[in] skip_mask Bitmask of ::internal_modules indexes not to load.
+ * @param[out] new_ctx Created context.
+ * @return LY_ERR value.
+ */
+static LY_ERR
+ly_ctx_new_int(const char *search_dir, uint32_t options, uint32_t skip_mask, struct ly_ctx **new_ctx)
 {
     struct ly_ctx *ctx = NULL;
     struct lys_module *module;
@@ -332,6 +344,10 @@ ly_ctx_new(const char *search_dir, uint32_t options, struct ly_ctx **new_ctx)
         int_mod_count -= LY_INTERNAL_YANGLIB_MODS_COUNT;
     }
     for (i = 0; i < int_mod_count; i++) {
+        if (skip_mask & (1U << i)) {
+            continue;
+        }
+
         rc = lys_parse_load(ctx, internal_modules[i].name, internal_modules[i].revision, &unres.creating, &module);
         LY_CHECK_GOTO(rc, cleanup);
 
@@ -355,6 +371,12 @@ cleanup:
         *new_ctx = ctx;
     }
     return rc;
+}
+
+LIBYANG_API_DEF LY_ERR
+ly_ctx_new(const char *search_dir, uint32_t options, struct ly_ctx **new_ctx)
+{
+    return ly_ctx_new_int(search_dir, options, 0, new_ctx);
 }
 
 static LY_ERR
@@ -480,6 +502,43 @@ cleanup:
     return ret;
 }
 
+/**
+ * @brief Get internal yang-library extension modules that yang-library data requires in a different revision.
+ *
+ * @param[in] set Set of yang-library 'module' data nodes.
+ * @return Bitmask of ::internal_modules indexes to skip.
+ */
+static uint32_t
+ly_ctx_yldata_skip_mask(const struct ly_set *set)
+{
+    const char *name, *revision;
+    struct lyd_node *node;
+    uint32_t i, j, mask = 0;
+
+    for (i = 0; i < set->count; ++i) {
+        name = NULL;
+        revision = NULL;
+        LY_LIST_FOR(lyd_child(set->dnodes[i]), node) {
+            if (!strcmp(node->schema->name, "name")) {
+                name = lyd_get_value(node);
+            } else if (!strcmp(node->schema->name, "revision")) {
+                revision = lyd_get_value(node);
+            }
+        }
+        if (!name || !revision) {
+            continue;
+        }
+
+        for (j = LY_INTERNAL_MODS_COUNT - LY_INTERNAL_YANGLIB_EXT_MODS_COUNT; j < LY_INTERNAL_MODS_COUNT; ++j) {
+            if (!strcmp(internal_modules[j].name, name) && strcmp(internal_modules[j].revision, revision)) {
+                mask |= 1U << j;
+            }
+        }
+    }
+
+    return mask;
+}
+
 LIBYANG_API_DEF LY_ERR
 ly_ctx_new_yldata(const char *search_dir, const struct lyd_node *tree, int options, struct ly_ctx **ctx)
 {
@@ -496,9 +555,11 @@ ly_ctx_new_yldata(const char *search_dir, const struct lyd_node *tree, int optio
 
     LY_CHECK_ARG_RET(NULL, tree, !strcmp(LYD_NAME(tree), "yang-library"), ctx, LY_EINVAL);
 
+    LY_CHECK_GOTO(ret = lyd_find_xpath(tree, "module-set[1]/module", &set), cleanup);
+
     /* create a new context */
     if (*ctx == NULL) {
-        LY_CHECK_GOTO(ret = ly_ctx_new(search_dir, options, &ctx_new), cleanup);
+        LY_CHECK_GOTO(ret = ly_ctx_new_int(search_dir, options, ly_ctx_yldata_skip_mask(set), &ctx_new), cleanup);
     } else {
         ctx_new = *ctx;
     }
@@ -509,7 +570,6 @@ ly_ctx_new_yldata(const char *search_dir, const struct lyd_node *tree, int optio
         no_expl_compile = 1;
     }
 
-    LY_CHECK_GOTO(ret = lyd_find_xpath(tree, "module-set[1]/module", &set), cleanup);
     if (set->count == 0) {
         /* perhaps a legacy data tree? */
         LY_CHECK_GOTO(ret = ly_ctx_new_yl_legacy(ctx_new, tree), cleanup);
@@ -1112,15 +1172,24 @@ ly_ctx_get_submodule2_latest(const struct lys_module *module, const char *submod
 LIBYANG_API_DEF uint32_t
 ly_ctx_internal_modules_count(const struct ly_ctx *ctx)
 {
+    uint32_t i, count;
+
     if (!ctx) {
         return 0;
     }
 
     if (ctx->opts & LY_CTX_NO_YANGLIBRARY) {
         return LY_INTERNAL_MODS_COUNT - LY_INTERNAL_YANGLIB_MODS_COUNT;
-    } else {
-        return LY_INTERNAL_MODS_COUNT;
     }
+
+    count = LY_INTERNAL_MODS_COUNT;
+    for (i = LY_INTERNAL_MODS_COUNT - LY_INTERNAL_YANGLIB_EXT_MODS_COUNT; i < LY_INTERNAL_MODS_COUNT; ++i) {
+        /* skipped because yang-library data required another revision */
+        if (!ly_ctx_get_module(ctx, internal_modules[i].name, internal_modules[i].revision)) {
+            --count;
+        }
+    }
+    return count;
 }
 
 /**
@@ -1191,6 +1260,11 @@ static LY_ERR
 ylib_version(struct lyd_node *parent, const struct lys_module *mod_semver, const struct lys_module *mod)
 {
     const char *str;
+
+    /* a replaced module revision may not define the node */
+    if (!lys_find_child(mod_semver->ctx, parent->schema, mod_semver, NULL, 0, "version", 0, 0)) {
+        return LY_SUCCESS;
+    }
 
     /* read semver of the module */
     lys_semver_get(mod, &str);
@@ -1265,6 +1339,11 @@ static LY_ERR
 ylib_augmentedby(struct lyd_node *parent, const struct lys_module *mod_augby, const struct lys_module *mod)
 {
     LYA_COUNT_T u;
+
+    /* a replaced module revision may not define the node */
+    if (!lys_find_child(mod_augby->ctx, parent->schema, mod_augby, NULL, 0, "augmented-by", 0, 0)) {
+        return LY_SUCCESS;
+    }
 
     LYA_FOR(mod->augmented_by, u) {
         LY_CHECK_RET(lyd_new_term(parent, mod_augby, "augmented-by", mod->augmented_by[u]->name, 0, NULL));
@@ -1412,7 +1491,9 @@ ly_ctx_get_yanglib_data(const struct ly_ctx *ctx, struct lyd_node **root_p, cons
 
         LY_CHECK_ERR_GOTO(ret = lyd_new_term(cont, NULL, "module-set", "complete", 0, NULL), free(str), error);
 
-        if (mod_status) {
+        /* a replaced module revision may not define the nodes */
+        if (mod_status && lys_find_child(ctx, cont->schema, mod_status, NULL, 0, "deprecated-nodes-implemented", 0, 0) &&
+                lys_find_child(ctx, cont->schema, mod_status, NULL, 0, "obsolete-nodes-absent", 0, 0)) {
             /* status augments */
             LY_CHECK_ERR_GOTO(ret = lyd_new_term(cont, mod_status, "deprecated-nodes-implemented", "true", 0, NULL),
                     free(str), error);
