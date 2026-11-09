@@ -146,10 +146,9 @@ Merge input data files into a single tree and validate at once. The option has e
 .TP
 .BR "\-a \fIPATH\fP\fR,\fP \-\^\-anchor=\fIPATH\fP"
 Requires -A; this option does not itself enable strict anydata parsing.
-Resolve anydata payload node identifiers among the direct data children of the schema node at absolute PATH.
-PATH uses module names as prefixes. The payload contains child nodes, not the anchor node itself;
-deeper descendants are not searched. The same anchor applies to all anydata
-payloads in the input files; anyxml is unchanged. Cannot be combined with operation data types, --merge,
+Parse anydata payload roots using the schema node at absolute PATH. PATH uses module names as prefixes.
+Only the first anydata instance encountered uses the anchor. The payload contains the anchored node itself,
+not just its children; anyxml is unchanged. Cannot be combined with operation data types, --merge,
 or --data-xpath.
 .TP
 .BR "\-y\fR,\fP \-\^\-yang\-library"

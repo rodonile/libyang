@@ -37,7 +37,7 @@ test_parse_anchor(void **state)
             "  namespace urn:tests:a;"
             "  prefix a;"
             "  anydata payload;"
-            "  container definitions { leaf value { type string; } }"
+            "  leaf value { type string; }"
             "}";
     const char *data[] = {
         "<payload xmlns=\"urn:tests:a\"><value>nested</value></payload>",
@@ -47,7 +47,7 @@ test_parse_anchor(void **state)
     struct lyd_node *tree, *expected;
     struct lyd_ctx *lydctx;
     struct ly_in *in;
-    const char *anchor = "/a:definitions";
+    const char *anchor = "/a:value";
     const char *anchors[] = {NULL, anchor};
     uint32_t i, j;
 
@@ -67,8 +67,7 @@ test_parse_anchor(void **state)
             if (!anchors[j]) {
                 assert_int_equal(lyd_compare_siblings(tree, expected, LYD_COMPARE_FULL_RECURSION), LY_SUCCESS);
             } else {
-                assert_ptr_equal(lyd_child_any(tree)->schema,
-                        lys_find_path(UTEST_LYCTX, NULL, "/a:definitions/value", 0));
+                assert_ptr_equal(lyd_child_any(tree)->schema, lys_find_path(UTEST_LYCTX, NULL, anchor, 0));
                 assert_string_equal(lyd_get_value(lyd_child_any(tree)), "nested");
             }
             lyd_free_all(tree);
@@ -85,7 +84,7 @@ test_parse_anchor(void **state)
                         LYD_INTOPT_WITH_SIBLINGS, NULL, &lydctx, anchors[j]), LY_SUCCESS);
             }
             assert_non_null(lydctx);
-            assert_ptr_equal(lydctx->anchor, anchors[j]);
+            assert_null(lydctx->anchor);
             lydctx->free(lydctx);
             lyd_free_all(tree);
             ly_in_free(in, 0);
@@ -98,7 +97,7 @@ test_parse_anchor(void **state)
         ly_in_free(in, 0);
         lyd_free_all(expected);
     }
-    assert_string_equal(anchor, "/a:definitions");
+    assert_string_equal(anchor, "/a:value");
 }
 
 static void
@@ -110,6 +109,7 @@ test_parse_anchor_same_identifier(void **state)
             "  container message {"
             "    leaf target { type string; }"
             "    anydata value;"
+            "    anydata value2;"
             "  }"
             "}";
     const char *example_schema =
@@ -123,19 +123,27 @@ test_parse_anchor_same_identifier(void **state)
             "  leaf a { type uint8 { range '1'; } }"
             "}";
     const char *json =
-            "{\"message:message\":{\"target\":\"/example:x\",\"value\":{\"example:a\":0}}}";
+            "{\"message:message\":{\"target\":\"/example:x/a\",\"value\":{\"example:a\":0},"
+            "\"value2\":{\"example:a\":1}}}";
     const char *invalid_json =
-            "{\"message:message\":{\"target\":\"/example:x\",\"value\":{\"example:a\":1}}}";
-    const char *siblings_json =
-            "{\"message:message\":{\"value\":{\"example:a\":0,\"example:b\":\"sibling\"}}}";
+            "{\"message:message\":{\"target\":\"/example:x/a\",\"value\":{\"example:a\":1},"
+            "\"value2\":{\"example:a\":1}}}";
     const char *invalid_payloads[] = {
         "{\"message:message\":{\"value\":{\"example:deep\":\"not a direct child\"}}}",
         "{\"message:message\":{\"value\":{\"example:x\":{}}}}",
         "{\"message:message\":{\"value\":{\"message:a\":0}}}"
     };
-    struct lyd_node *message, *tree, *target, *value, *payload;
+    struct lyd_node *message, *tree, *target, *value, *payload, *binary_tree;
     struct ly_in *in;
+    struct ly_out *out;
+    char *buffer;
     const char *anchor;
+    LYD_FORMAT binary_formats[] = {
+        LYD_LYB,
+#ifdef ENABLE_CBOR_SUPPORT
+        LYD_CBOR,
+#endif
+    };
     uint32_t i;
 
     UTEST_ADD_MODULE(message_schema, LYS_IN_YANG, NULL, NULL);
@@ -144,7 +152,7 @@ test_parse_anchor_same_identifier(void **state)
     CHECK_PARSE_LYD_PARAM(json, LYD_JSON, LYD_PARSE_ONLY, 0, LY_SUCCESS, message);
     assert_int_equal(lyd_find_path(message, "target", 0, &target), LY_SUCCESS);
     anchor = lyd_get_value(target);
-    assert_string_equal(anchor, "/example:x");
+    assert_string_equal(anchor, "/example:x/a");
 
     assert_int_equal(ly_in_new_memory(json, &in), LY_SUCCESS);
     assert_int_equal(lyd_parse_data_with_anchor(UTEST_LYCTX, NULL, in, LYD_JSON, LYD_PARSE_ANYDATA_STRICT,
@@ -152,11 +160,31 @@ test_parse_anchor_same_identifier(void **state)
     assert_int_equal(lyd_find_path(tree, "value", 0, &value), LY_SUCCESS);
     payload = lyd_child_any(value);
     assert_non_null(payload);
-    assert_ptr_equal(payload->schema, lys_find_path(UTEST_LYCTX, NULL, "/example:x/a", 0));
+    assert_ptr_equal(payload->schema, lys_find_path(UTEST_LYCTX, NULL, anchor, 0));
     assert_ptr_not_equal(payload->schema, lys_find_path(UTEST_LYCTX, NULL, "/example:a", 0));
     assert_string_equal(lyd_get_value(payload), "0");
-    lyd_free_all(tree);
+
+    assert_int_equal(lyd_find_path(tree, "value2", 0, &value), LY_SUCCESS);
+    assert_ptr_equal(lyd_child_any(value)->schema, lys_find_path(UTEST_LYCTX, NULL, "/example:a", 0));
     ly_in_free(in, 0);
+
+    for (i = 0; i < sizeof binary_formats / sizeof *binary_formats; ++i) {
+        buffer = NULL;
+        assert_int_equal(ly_out_new_memory(&buffer, 0, &out), LY_SUCCESS);
+        assert_int_equal(lyd_print_all(out, tree, binary_formats[i], 0), LY_SUCCESS);
+        assert_int_equal(ly_in_new_memory_chunk(buffer, ly_out_printed(out), &in), LY_SUCCESS);
+        assert_int_equal(lyd_parse_data_with_anchor(UTEST_LYCTX, NULL, in, binary_formats[i],
+                LYD_PARSE_ANYDATA_STRICT, LYD_VALIDATE_PRESENT, &binary_tree, anchor), LY_SUCCESS);
+        assert_int_equal(lyd_find_path(binary_tree, "value", 0, &value), LY_SUCCESS);
+        assert_ptr_equal(lyd_child_any(value)->schema, lys_find_path(UTEST_LYCTX, NULL, anchor, 0));
+        assert_int_equal(lyd_find_path(binary_tree, "value2", 0, &value), LY_SUCCESS);
+        assert_ptr_equal(lyd_child_any(value)->schema, lys_find_path(UTEST_LYCTX, NULL, "/example:a", 0));
+        lyd_free_all(binary_tree);
+        ly_in_free(in, 0);
+        ly_out_free(out, NULL, 1);
+    }
+
+    lyd_free_all(tree);
 
     assert_int_equal(ly_in_new_memory(invalid_json, &in), LY_SUCCESS);
     assert_int_equal(lyd_parse_data_with_anchor(UTEST_LYCTX, NULL, in, LYD_JSON, LYD_PARSE_ANYDATA_STRICT,
@@ -164,16 +192,6 @@ test_parse_anchor_same_identifier(void **state)
     assert_null(tree);
     assert_non_null(ly_err_last(UTEST_LYCTX));
     UTEST_LOG_CTX_CLEAN;
-    ly_in_free(in, 0);
-
-    assert_int_equal(ly_in_new_memory(siblings_json, &in), LY_SUCCESS);
-    assert_int_equal(lyd_parse_data_with_anchor(UTEST_LYCTX, NULL, in, LYD_JSON, LYD_PARSE_ANYDATA_STRICT,
-            LYD_VALIDATE_PRESENT, &tree, anchor), LY_SUCCESS);
-    assert_int_equal(lyd_find_path(tree, "value", 0, &value), LY_SUCCESS);
-    payload = lyd_child_any(value);
-    assert_non_null(payload->next);
-    assert_ptr_equal(payload->next->schema, lys_find_path(UTEST_LYCTX, NULL, "/example:x/b", 0));
-    lyd_free_all(tree);
     ly_in_free(in, 0);
 
     for (i = 0; i < sizeof invalid_payloads / sizeof *invalid_payloads; ++i) {
@@ -253,7 +271,7 @@ test_parse_anchor_validation(void **state)
         for (j = 0; j < sizeof data / sizeof *data; ++j) {
             assert_int_equal(ly_in_new_memory(data[j][i], &in), LY_SUCCESS);
             ret = lyd_parse_data_with_anchor(UTEST_LYCTX, NULL, in, formats[i], LYD_PARSE_ANYDATA_STRICT,
-                    LYD_VALIDATE_PRESENT, &tree, "/a:definitions");
+                    LYD_VALIDATE_PRESENT, &tree, "/a:definitions/record");
             if (!j) {
                 assert_int_equal(ret, LY_SUCCESS);
                 payload = lyd_child_any(tree);
@@ -275,7 +293,7 @@ test_parse_anchor_validation(void **state)
 
         assert_int_equal(ly_in_new_memory(data[1][i], &in), LY_SUCCESS);
         assert_int_equal(lyd_parse_data_with_anchor(UTEST_LYCTX, NULL, in, formats[i], LYD_PARSE_ANYDATA_STRICT | LYD_PARSE_ONLY,
-                LYD_VALIDATE_PRESENT, &tree, "/a:definitions"), LY_SUCCESS);
+                LYD_VALIDATE_PRESENT, &tree, "/a:definitions/record"), LY_SUCCESS);
         lyd_free_all(tree);
         ly_in_free(in, 0);
 
@@ -283,7 +301,7 @@ test_parse_anchor_validation(void **state)
             assert_int_equal(ly_in_new_memory(data[3][i], &in), LY_SUCCESS);
             ret = lyd_parse_data_with_anchor(UTEST_LYCTX, NULL, in, formats[i],
                     LYD_PARSE_ANYDATA_STRICT | LYD_PARSE_OPAQ | (j ? 0 : LYD_PARSE_ONLY), LYD_VALIDATE_PRESENT,
-                    &tree, "/a:definitions");
+                    &tree, "/a:definitions/record");
             if (!j) {
                 assert_int_equal(ret, LY_SUCCESS);
                 assert_null(lyd_child(lyd_child_any(tree))->schema);
@@ -299,7 +317,7 @@ test_parse_anchor_validation(void **state)
 
         assert_int_equal(ly_in_new_memory(data[2][i], &in), LY_SUCCESS);
         assert_int_equal(lyd_parse_data_with_anchor(UTEST_LYCTX, NULL, in, formats[i], LYD_PARSE_ANYDATA_STRICT,
-                LYD_VALIDATE_PRESENT | LYD_VALIDATE_MULTI_ERROR, &tree, "/a:definitions"), LY_EVALID);
+                LYD_VALIDATE_PRESENT | LYD_VALIDATE_MULTI_ERROR, &tree, "/a:definitions/record"), LY_EVALID);
         assert_null(tree);
         assert_non_null(ly_err_last(UTEST_LYCTX));
         UTEST_LOG_CTX_CLEAN;
@@ -318,14 +336,14 @@ test_parse_anchor_validation(void **state)
 
     assert_int_equal(ly_in_new_memory("<arbitrary xmlns=\"urn:tests:a\"><unknown/></arbitrary>", &in), LY_SUCCESS);
     assert_int_equal(lyd_parse_data_with_anchor(UTEST_LYCTX, NULL, in, LYD_XML, 0,
-            LYD_VALIDATE_PRESENT, &tree, "/a:definitions"), LY_SUCCESS);
+            LYD_VALIDATE_PRESENT, &tree, "/a:definitions/record"), LY_SUCCESS);
     lyd_free_all(tree);
     ly_in_free(in, 0);
 
     CHECK_PARSE_LYD_PARAM("<payload xmlns=\"urn:tests:a\"/>", LYD_XML, 0, LYD_VALIDATE_PRESENT, LY_SUCCESS, tree);
     assert_int_equal(ly_in_new_memory("<record xmlns=\"urn:tests:a\"><value>6</value></record>", &in), LY_SUCCESS);
     assert_int_equal(lyd_parse_data_with_anchor(NULL, tree, in, LYD_XML, LYD_PARSE_ANYDATA_STRICT,
-            LYD_VALIDATE_PRESENT, &payload, "/a:definitions"), LY_SUCCESS);
+            LYD_VALIDATE_PRESENT, &payload, "/a:definitions/record"), LY_SUCCESS);
     assert_ptr_equal(payload, lyd_child_any(tree));
     assert_ptr_equal(payload->schema, lys_find_path(UTEST_LYCTX, NULL, "/a:definitions/record", 0));
     lyd_free_all(tree);
@@ -335,14 +353,14 @@ test_parse_anchor_validation(void **state)
         for (j = 0; j < 2; ++j) {
             assert_int_equal(ly_in_new_memory(data[j][0], &in), LY_SUCCESS);
             assert_int_equal(lyd_parse_data_with_anchor(UTEST_LYCTX, NULL, in, LYD_XML, LYD_PARSE_ANYDATA_STRICT | LYD_PARSE_ONLY,
-                    LYD_VALIDATE_PRESENT, &source, "/a:definitions"), LY_SUCCESS);
+                    LYD_VALIDATE_PRESENT, &source, "/a:definitions/record"), LY_SUCCESS);
             ly_in_free(in, 0);
             buffer = NULL;
             assert_int_equal(ly_out_new_memory(&buffer, 0, &out), LY_SUCCESS);
             assert_int_equal(lyd_print_all(out, source, binary_formats[i], 0), LY_SUCCESS);
             assert_int_equal(ly_in_new_memory_chunk(buffer, ly_out_printed(out), &in), LY_SUCCESS);
             ret = lyd_parse_data_with_anchor(UTEST_LYCTX, NULL, in, binary_formats[i], LYD_PARSE_ANYDATA_STRICT,
-                    LYD_VALIDATE_PRESENT, &tree, "/a:definitions");
+                    LYD_VALIDATE_PRESENT, &tree, "/a:definitions/record");
             if (!j) {
                 assert_int_equal(ret, LY_SUCCESS);
             } else {
@@ -363,7 +381,7 @@ test_parse_anchor_validation(void **state)
             assert_int_equal(lyd_print_all(out, source, binary_formats[i], 0), LY_SUCCESS);
             assert_int_equal(ly_in_new_memory_chunk(buffer, ly_out_printed(out), &in), LY_SUCCESS);
             assert_int_equal(lyd_parse_data_with_anchor(UTEST_LYCTX, NULL, in, binary_formats[i], LYD_PARSE_ANYDATA_STRICT,
-                    LYD_VALIDATE_PRESENT, &tree, "/a:definitions"), LY_EVALID);
+                    LYD_VALIDATE_PRESENT, &tree, "/a:definitions/record"), LY_EVALID);
             assert_null(tree);
             assert_non_null(ly_err_last(UTEST_LYCTX));
             UTEST_LOG_CTX_CLEAN;

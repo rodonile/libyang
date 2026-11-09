@@ -422,7 +422,7 @@ test_yang_patch_anchor(void **state)
         "{\"ietf-yang-patch:yang-patch\":{"
         "\"patch-id\":\"patch-2\",\"edit\":[{"
         "\"edit-id\":\"edit-1\",\"operation\":\"replace\","
-        "\"target\":\"/example:configuration/other/limit\","
+        "\"target\":\"/example:configuration/other\","
         "\"value\":{\"example:settings\":{\"limit\":42}}}]}}",
         "{\"ietf-yang-patch:yang-patch\":{"
         "\"patch-id\":\"patch-3\",\"edit\":[{"
@@ -432,7 +432,7 @@ test_yang_patch_anchor(void **state)
     };
     struct lyd_node *message, *tree, *target, *value, *payload;
     struct ly_in *in;
-    char *anchor;
+    const char *anchor;
     uint32_t i;
     LY_ERR ret;
 
@@ -443,9 +443,8 @@ test_yang_patch_anchor(void **state)
     for (i = 0; i < sizeof messages / sizeof *messages; ++i) {
         CHECK_PARSE_LYD_PARAM(messages[i], LYD_JSON, LYD_PARSE_ONLY, 0, LY_SUCCESS, message);
         assert_int_equal(lyd_find_path(message, "edit[edit-id='edit-1']/target", 0, &target), LY_SUCCESS);
-        anchor = strdup(lyd_get_value(target));
+        anchor = lyd_get_value(target);
         assert_non_null(anchor);
-        *strrchr(anchor, '/') = '\0';
         assert_int_equal(lyd_find_path(message, "edit[edit-id='edit-1']/value", 0, &value), LY_SUCCESS);
         assert_non_null(lyd_child_any(value));
         assert_null(lyd_child_any(value)->schema);
@@ -458,7 +457,7 @@ test_yang_patch_anchor(void **state)
             assert_int_equal(lyd_find_path(tree, "edit[edit-id='edit-1']/value", 0, &value), LY_SUCCESS);
             payload = lyd_child_any(value);
             assert_non_null(payload);
-            assert_ptr_equal(lysc_data_parent(payload->schema), lys_find_path(UTEST_LYCTX, NULL, anchor, 0));
+            assert_ptr_equal(payload->schema, lys_find_path(UTEST_LYCTX, NULL, anchor, 0));
             assert_string_equal(payload->schema->name, "settings");
             assert_string_equal(lyd_get_value(lyd_child(payload)), "42");
         } else {
@@ -470,7 +469,6 @@ test_yang_patch_anchor(void **state)
         lyd_free_all(tree);
         ly_in_free(in, 0);
         lyd_free_all(message);
-        free(anchor);
     }
 }
 

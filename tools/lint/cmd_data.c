@@ -147,8 +147,9 @@ cmd_data_help(void)
             "                Enable strict parsing of anydata content\n"
             "  -a PATH, --anchor=PATH\n"
             "                Requires --anydata-strict (-A).\n"
-            "                Resolve anydata payload roots among the direct data children of\n"
-            "                absolute schema PATH (module names as prefixes). Not supported with\n"
+            "                Parse anydata payload roots using the schema node at absolute\n"
+            "                PATH (module names as prefixes). Only the first anydata instance\n"
+            "                uses the anchor. Not supported with\n"
             "                operation types, --merge, or --xpath.\n");
     cmd_data_help_format();
     cmd_data_help_in_format();

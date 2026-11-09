@@ -599,6 +599,9 @@ lydxml_subtree_get_snode(struct lyd_xml_ctx *lydctx, const struct lyd_node *pare
     LY_CHECK_RET(r && (r != LY_ENOT), r);
 
     if (!r) {
+        if (parent && parent->schema && (parent->schema->nodetype == LYS_ANYDATA) && lydctx->anchor) {
+            lydctx->anchor = NULL;
+        }
         /* check that schema node is valid and can be used */
         LY_CHECK_RET(lyd_parser_check_schema((struct lyd_ctx *)lydctx, *snode));
         LY_CHECK_RET(lydxml_data_check_opaq(lydctx, snode));
@@ -987,6 +990,9 @@ lydxml_subtree_any(struct lyd_xml_ctx *lydctx, const struct lysc_node *snode, co
     }
 
 cleanup:
+    if (snode->nodetype == LYS_ANYDATA) {
+        lydctx->anchor = NULL;
+    }
     lydctx->parse_opts = prev_parse_opts;
     lydctx->int_opts = prev_int_opts;
     free(val);
